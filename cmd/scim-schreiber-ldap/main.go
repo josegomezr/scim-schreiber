@@ -4,12 +4,28 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	ldap "github.com/go-ldap/ldap/v3"
 	"github.com/josegomezr/scim-schreiber-ldap/internal/scim"
-	"io"
+	"iter"
+	"log/slog"
 	"net/http"
 	"os"
+	"reflect"
 	"strings"
 )
+
+func CastSingleValue[T any](input interface{}) T {
+	output, ok := input.(T)
+	return output
+}
+
+func CastMultiValue[T any](input interface{}) []T {
+	var out []T
+	for _, i := range input.([]interface{}) {
+		out = append(out, CastSingleValue[T](i))
+	}
+	return out
+}
 
 // TODO(josegomezr): Move these DTO into response types
 type User struct {
@@ -24,51 +40,93 @@ type Group struct {
 	DisplayName string
 }
 
-func searchGroup(cn string) *Group {
-	users, err := connectAndSearch(fmt.Sprintf("cn=%s", cn))
+func ldapEntryToUserResponse(entry *ldap.Entry) *scim.UserRespOK {
+	return &scim.UserRespOK{
+		ExternalId: entry.DN,
+		Id:         entry.GetAttributeValue("uuid"),
+	}
+}
+
+func ldapEntryToGroupResponse(entry *ldap.Entry) *scim.GroupRespOK {
+	members := []scim.ValueObj{}
+	for _, value := range entry.GetAttributeValues("memberUid") {
+		members = append(members, scim.ValueObj{
+			Value: value,
+		})
+	}
+	return &scim.GroupRespOK{
+		ExternalId:  entry.DN,
+		DisplayName: entry.GetAttributeValue("cn"),
+		Members:     members,
+	}
+}
+
+func searchGroups(uid string, field string) (iter.Seq2[*ldap.Entry, error], error) {
+	endpoint := os.Getenv("LDAP_URL")
+	bindDn := os.Getenv("LDAP_BIND_DN")
+	bindPw := os.Getenv("LDAP_BIND_PW")
+
+	conn, err := connectAndBind(endpoint, bindDn, bindPw)
+	if err != nil {
+		return nil, err
+	}
+
+	filter := fmt.Sprintf("(%s=%s)", field, uid)
+
+	baseUid := os.Getenv("LDAP_BASE_GROUP_OU") + "," + os.Getenv("LDAP_BASE_DN")
+	return ldapSearchIter(conn, filter, baseUid), nil
+}
+
+func searchUsers(uid string, field string) (iter.Seq2[*ldap.Entry, error], error) {
+	endpoint := os.Getenv("LDAP_URL")
+	bindDn := os.Getenv("LDAP_BIND_DN")
+	bindPw := os.Getenv("LDAP_BIND_PW")
+
+	conn, err := connectAndBind(endpoint, bindDn, bindPw)
+	if err != nil {
+		return nil, err
+	}
+
+	filter := fmt.Sprintf("(%s=%s)", field, uid)
+
+	baseUid := os.Getenv("LDAP_BASE_USER_OU") + "," + os.Getenv("LDAP_BASE_DN")
+	return ldapSearchIter(conn, filter, baseUid), nil
+}
+
+func _searchUser(uid string, field string) *ldap.Entry {
+	users, err := searchUsers(uid, field)
 	if err != nil {
 		return nil
 	}
 
-	if len(users) < 1 {
-		return nil
+	for user, err := range users {
+		if err != nil {
+			return nil
+		}
+		return user
 	}
 
-	// TODO(josegomezr): Align with Group DTO
-	return &Group{
-		Dn:          users[0].DN,
-		DisplayName: users[0].GetAttributeValue("cn"),
-	}
+	return nil
 }
 
-func _searchUser(uid string, field string) *User {
-	users, err := connectAndSearch(fmt.Sprintf("%s=%s", field, uid))
-	if err != nil {
-		return nil
-	}
-
-	if len(users) < 1 {
-		return nil
-	}
-
-	// TODO(josegomezr): Align with User DTO
-	return &User{
-		Uid:         users[0].GetAttributeValue("uid"),
-		Dn:          users[0].DN,
-		Uuid:        users[0].GetAttributeValue("uuid"),
-		DisplayName: users[0].GetAttributeValue("cn"),
-	}
-}
-
-func searchUser(uid string) *User {
+func searchUser(uid string) *ldap.Entry {
 	return _searchUser(uid, "uid")
 }
 
-func searchUserByUUID(uid string) *User {
+func searchUserByUUID(uid string) *ldap.Entry {
 	return _searchUser(uid, "uuid")
 }
 
+type Config struct {
+	AllowUserCreation     bool
+	GroupCreationIsUpsert bool
+}
+
 func main() {
+	cfg := Config{
+		AllowUserCreation:     false,
+		GroupCreationIsUpsert: true,
+	}
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /-/startup", func(w http.ResponseWriter, r *http.Request) {
@@ -81,88 +139,118 @@ func main() {
 	})
 
 	mux.HandleFunc("GET /v2/ServiceProviderConfig", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Println("GET /v2/ServiceProviderConfig")
+		slog.Info("GET /v2/ServiceProviderConfig")
 		json.NewEncoder(w).Encode(NewServiceProviderConfig())
 	})
 
 	// TODO(josegomezr): Split handlers into separate functions
-
 	mux.HandleFunc("POST /v2/Users", func(w http.ResponseWriter, r *http.Request) {
 		obj := scim.UserRequest{}
 		err := json.NewDecoder(r.Body).Decode(&obj)
-		fmt.Printf("POST /v2/Users %+v\n", obj)
+		slog.Info("POST /v2/Users")
 		if err != nil {
 			w.WriteHeader(400)
-			fmt.Fprintln(w, "bad json")
 			return
 		}
 
+		slog.Info("POST /v2/Users", "request", obj)
 		if searchUser(obj.UserName) != nil {
-			w.WriteHeader(409)
+			w.WriteHeader(http.StatusConflict)
 			return
 		}
 
-		fmt.Printf("Creating (or maybe updating?) User by request: %+v\n", obj)
-
-		w.WriteHeader(201)
-		json.NewEncoder(w).Encode(scim.UserRespOK{
-			ExternalId: fmt.Sprintf("uid=id-for-%s", obj.UserName),
-			Id:         obj.ExternalId,
-		})
+		if !cfg.AllowUserCreation {
+			w.WriteHeader(http.StatusForbidden)
+		} else {
+			// Not implemented.
+			w.WriteHeader(http.StatusNotAcceptable)
+		}
 	})
 
 	mux.HandleFunc("GET /v2/Users", func(w http.ResponseWriter, r *http.Request) {
 		qs := r.URL.Query()
-		fmt.Printf("GET /v2/Users %+v\n", qs)
+		slog.Info("GET /v2/Users", "qs", qs)
 
 		filter := qs.Get("filter")
 		if filter != "" && !strings.HasPrefix(filter, `userName eq "`) {
-			w.WriteHeader(400)
+			w.WriteHeader(http.StatusBadRequest)
 			fmt.Fprintln(w, "{}")
 			return
 		}
 
-		if filter == "" {
-			// TODO: don't be lazy, do things well...
-			filter = `userName eq "*"`
+		uid := "*"
+		if filter != "" {
+			uid = filter[13 : len(filter)-1]
 		}
-
-		uid := filter[13 : len(filter)-1]
 
 		resp := scim.UserFilterResponse{}
 		resp.Resources = make([]scim.UserRespOK, 0)
 
-		if u := searchUser(uid); u != nil {
-			resp.Resources = append(resp.Resources, scim.UserRespOK{
-				ExternalId: u.Dn,
-				Id:         u.Uuid,
-			})
+		users, err := searchUsers(uid, "uid")
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintln(w, "{}")
 		}
+
+		//  TODO: Implement pagination here.
+		for entry, err := range users {
+			if err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				fmt.Fprintln(w, "{}")
+				return
+			}
+
+			resp.Resources = append(resp.Resources, *ldapEntryToUserResponse(entry))
+		}
+
 		w.WriteHeader(200)
 		json.NewEncoder(w).Encode(resp)
 		return
+	})
+
+	mux.HandleFunc("GET /v2/Users/{user_uuid}", func(w http.ResponseWriter, r *http.Request) {
+		userUuid := r.PathValue("user_uuid")
+		slog.Info("GET /v2/Users/", "userUuid", userUuid)
+
+		users, err := searchUsers(userUuid, "uuid")
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintln(w, "{}")
+		}
+
+		//  TODO: Implement pagination here.
+		for entry, err := range users {
+			if err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				fmt.Fprintln(w, "{}")
+				return
+			}
+
+			w.WriteHeader(200)
+			json.NewEncoder(w).Encode(ldapEntryToUserResponse(entry))
+			return
+		}
+
+		w.WriteHeader(404)
 	})
 
 	mux.HandleFunc("PUT /v2/Users/{user_id}", func(w http.ResponseWriter, r *http.Request) {
 		userId := r.PathValue("user_id")
 		obj := scim.UserRequest{}
 		err := json.NewDecoder(r.Body).Decode(&obj)
-		fmt.Printf("PUT /v2/Users/%s %+v\n", userId, obj)
+		slog.Info("PUT /v2/Users/%s", userId, "obj", obj)
 		if err != nil {
 			w.WriteHeader(401)
 			fmt.Fprintln(w, "{}")
 			return
 		}
 
-		if u := searchUserByUUID(userId); u != nil {
-			fmt.Printf("Found user=%+v\n", u)
+		if entry := searchUserByUUID(userId); entry != nil {
+			slog.Info("Found user", "entry", entry)
 			// TODO(josegomezr): change more details
-			fmt.Printf("Updating user details. from=%q to=%q\n", u.DisplayName, obj.DisplayName)
+			slog.Info("Updating user details. from=%q to=%q\n", entry.GetAttributeValue("cn"), obj.DisplayName)
 			w.WriteHeader(200)
-			json.NewEncoder(w).Encode(scim.UserRespOK{
-				ExternalId: u.Dn,
-				Id:         u.Uid,
-			})
+			json.NewEncoder(w).Encode(ldapEntryToUserResponse(entry))
 			return
 		}
 		w.WriteHeader(404)
@@ -192,7 +280,7 @@ func main() {
 	mux.HandleFunc("POST /v2/Groups", func(w http.ResponseWriter, r *http.Request) {
 		obj := scim.GroupRequest{}
 		err := json.NewDecoder(r.Body).Decode(&obj)
-		fmt.Printf("POST /v2/Groups %+v\n", obj)
+		slog.Info("POST /v2/Groups", "obj", obj)
 
 		if err != nil {
 			fmt.Println("post-group:", err)
@@ -201,66 +289,139 @@ func main() {
 			return
 		}
 
-		if searchGroup(obj.DisplayName) != nil {
-			w.WriteHeader(409)
+		entries, err := searchGroups(obj.DisplayName, "cn")
+		if err != nil {
+			w.WriteHeader(400)
 			return
 		}
 
-		// TODO(josegomezr): write 2xx responses when the previous behavior works
-		// w.WriteHeader(201)
-		// json.NewEncoder(w).Encode(scim.UserRespOK{
-		// 	ExternalId: fmt.Sprintf("uid=id-for-%s", obj.UserName),
-		// 	Id: obj.ExternalId,
-		// })
+		for entry, err := range entries {
+			if err != nil {
+				w.WriteHeader(400)
+				return
+			}
+
+			if cfg.GroupCreationIsUpsert {
+				w.WriteHeader(201)
+				json.NewEncoder(w).Encode(ldapEntryToGroupResponse(entry))
+				return
+			} else {
+				w.WriteHeader(400)
+				return
+			}
+		}
 	})
 
-	mux.HandleFunc("GET /v2/Groups", func(w http.ResponseWriter, r *http.Request) {
-		qs := r.URL.Query()
-		fmt.Printf("GET /v2/Groups %+v\n", qs)
+	mux.HandleFunc("GET /v2/Groups/{group_id}", func(w http.ResponseWriter, r *http.Request) {
+		groupId := r.PathValue("group_id")
+		slog.Info("GET /v2/Groups", "groupId", groupId)
 
-		filter := qs.Get("filter")
-		if filter != "" && !strings.HasPrefix(filter, `userName eq "`) {
+		entries, err := searchGroups(groupId, "cn")
+		if err != nil {
+			w.WriteHeader(400)
+			return
+		}
+
+		for entry, err := range entries {
+			if err != nil {
+				w.WriteHeader(400)
+				return
+			}
+
+			w.WriteHeader(201)
+			json.NewEncoder(w).Encode(ldapEntryToGroupResponse(entry))
+			return
+		}
+
+		w.WriteHeader(404)
+	})
+
+	mux.HandleFunc("PATCH /v2/Groups/{group_id}", func(w http.ResponseWriter, r *http.Request) {
+		groupId := r.PathValue("group_id")
+		slog.Info("PATCH /v2/Groups", "groupId", groupId)
+
+		obj := scim.PatchRequest{}
+		err := json.NewDecoder(r.Body).Decode(&obj)
+		if err != nil {
 			w.WriteHeader(400)
 			fmt.Fprintln(w, "{}")
 			return
 		}
+		slog.Info("PATCH /v2/Groups", "obj", obj)
 
-		if filter == "" {
-			// TODO: don't be lazy, do things well...
-			filter = `userName eq "*"`
+		entries, err := searchGroups(groupId, "cn")
+		if err != nil {
+			w.WriteHeader(400)
+			return
 		}
 
-		uid := filter[13 : len(filter)-1]
+		for entry, err := range entries {
+			if err != nil {
+				w.WriteHeader(400)
+				return
+			}
 
-		resp := scim.UserFilterResponse{}
-		resp.Resources = make([]scim.UserRespOK, 0)
+			adds := make(map[string][]string)
+			removes := make(map[string][]string)
+			replaces := make(map[string]string)
 
-		if u := searchUser(uid); u != nil {
-			resp.Resources = append(resp.Resources, scim.UserRespOK{
-				ExternalId: u.Dn,
-				Id:         u.Uuid,
-			})
+			for _, op := range obj.Operations {
+				if reflect.ValueOf(op.Value).Kind() == reflect.Slice {
+					for _, singleVal := range CastMultiValue[map[string]interface{}](op.Value) {
+						value := CastSingleValue[string](singleVal["value"])
+
+						switch op.Operation {
+						case "add":
+							adds[op.Path] = append(adds[op.Path], value)
+						case "remove":
+							removes[op.Path] = append(removes[op.Path], value)
+						default:
+							slog.Info("unknown OP", "operation", op.Operation, "path", op.Path, "value", singleVal)
+							continue
+						}
+					}
+				} else {
+					switch op.Operation {
+					case "add":
+						adds[op.Path] = append(adds[op.Path], fmt.Sprintf("%s", op.Value))
+					case "remove":
+						removes[op.Path] = append(removes[op.Path], fmt.Sprintf("%s", op.Value))
+					case "replace":
+						for k, v := range op.Value.(map[string]interface{}) {
+							replaces[k] = fmt.Sprintf("%s", v)
+						}
+					default:
+						slog.Info("unknown OP", "operation", op.Operation, "path", op.Path, "value", op.Value)
+						continue
+					}
+				}
+			}
+
+			fmt.Println("dn:", entry.DN)
+			fmt.Println("changeType:", "modify")
+			for k, vals := range adds {
+				for _, v := range vals {
+					fmt.Println("add:", k)
+					fmt.Println(k, v)
+				}
+			}
+			fmt.Println("-")
+			for k, vals := range removes {
+				for _, v := range vals {
+					fmt.Println("delete:", k)
+					fmt.Println(k, v)
+				}
+			}
+			fmt.Println("-")
+			for k, v := range replaces {
+				fmt.Println("replace:", k)
+				fmt.Println(k, v)
+			}
+			w.WriteHeader(200)
+			json.NewEncoder(w).Encode(nil)
+
+			return
 		}
-		w.WriteHeader(200)
-		json.NewEncoder(w).Encode(resp)
-		return
-	})
-
-	mux.HandleFunc("PUT /v2/Groups/{user_id}", func(w http.ResponseWriter, r *http.Request) {
-		userId := r.PathValue("user_id")
-		fmt.Printf("PUT /v2/Groups/%s\n", userId)
-		// TODO(josegomezr): Group membership comes PUT/PATCH ops that are not handled yet.
-		io.Copy(os.Stdout, r.Body)
-
-		// if u := searchUserByUUID(userId); u != nil {
-		// 	fmt.Println("Found user=", userId)
-		// 	w.WriteHeader(200)
-		// 	json.NewEncoder(w).Encode(scim.UserRespOK{
-		// 		ExternalId: u.Dn,
-		// 		Id: u.Uid,
-		// 	})
-		// 	return
-		// }
 
 		w.WriteHeader(404)
 		fmt.Fprintln(w, "{}")

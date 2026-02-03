@@ -62,6 +62,26 @@ type UserRespOK struct {
 	ExternalId string `json:"externalId"`
 }
 
+type GroupRespOK struct {
+	ExternalId  string     `json:"externalId"`
+	DisplayName string     `json:"displayName"`
+	Members     []ValueObj `json:"members"`
+}
+
 type UserFilterResponse struct {
 	Resources []UserRespOK `json:"Resources"`
+}
+
+type ValueObj struct {
+	Value string `json:"value"`
+}
+
+type PatchOp struct {
+	Operation string      `json:"op"`
+	Path      string      `json:"path"`
+	Value     interface{} `json:"value"`
+}
+
+type PatchRequest struct {
+	Operations []PatchOp
 }
