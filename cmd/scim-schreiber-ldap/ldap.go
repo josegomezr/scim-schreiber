@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	ldap "github.com/go-ldap/ldap/v3"
 	"iter"
 	"log/slog"
@@ -132,4 +133,80 @@ func ldapFind(conn *ldap.Conn, dn string) (*ldap.Entry, error) {
 	return sr.Entries[0], nil
 }
 
+func setupLdap() error {
+	ldapEndpoint := os.Getenv("LDAP_URL")
+	ldapBindDn := os.Getenv("LDAP_BIND_DN")
+	ldapBindPw := os.Getenv("LDAP_BIND_PW")
+
+	conn, err := connectAndBind(ldapEndpoint, ldapBindDn, ldapBindPw)
+	if err != nil {
+		return err
+	}
+
+	LDAP_CONN = conn
+	return nil
+}
+
+func updateEntry(conn *ldap.Conn, dn string, adds map[string][]string, removes map[string][]string, replaces map[string][]string) error {
+	request := ldap.NewModifyRequest(dn, nil)
+
+	if adds != nil {
+		for k, vals := range adds {
+			request.Add(k, vals)
+		}
+	}
+	if removes != nil {
+		for k, vals := range removes {
+			request.Delete(k, vals)
+		}
+	}
+	if replaces != nil {
+		for k, v := range replaces {
+			request.Replace(k, v)
+		}
+	}
+	fmt.Printf("adds: %+v\n", adds)
+	fmt.Printf("removes: %+v\n", removes)
+	fmt.Printf("replaces: %+v\n", replaces)
+	return conn.Modify(request)
+}
+
 var LDAP_CONN *ldap.Conn
+
+func searchGroups(uid string, field string) (iter.Seq2[*ldap.Entry, error], error) {
+	filter := fmt.Sprintf("(%s=%s)", field, uid)
+
+	baseUid := os.Getenv("LDAP_BASE_GROUP_OU") + "," + os.Getenv("LDAP_BASE_DN")
+	return ldapSearchIter(LDAP_CONN, filter, baseUid), nil
+}
+
+func searchUsers(uid string, field string) (iter.Seq2[*ldap.Entry, error], error) {
+	filter := fmt.Sprintf("(%s=%s)", field, uid)
+
+	baseUid := os.Getenv("LDAP_BASE_USER_OU") + "," + os.Getenv("LDAP_BASE_DN")
+	return ldapSearchIter(LDAP_CONN, filter, baseUid), nil
+}
+
+func _searchUser(uid string, field string) *ldap.Entry {
+	users, err := searchUsers(uid, field)
+	if err != nil {
+		return nil
+	}
+
+	for user, err := range users {
+		if err != nil {
+			return nil
+		}
+		return user
+	}
+
+	return nil
+}
+
+func searchUser(uid string) *ldap.Entry {
+	return _searchUser(uid, "uid")
+}
+
+func searchUserByUUID(uid string) *ldap.Entry {
+	return _searchUser(uid, "uuid")
+}

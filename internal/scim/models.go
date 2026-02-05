@@ -39,13 +39,14 @@ type UserName struct {
 // TODO(josegomezr): Expand on the property mappings side and here what do we
 // want to persist from authentik into LDAP
 type UserRequest struct {
-	Schemas     []string    `json:"schemas"`
-	Active      bool        `json:"active"`
-	Emails      []UserEmail `json:"emails"`
-	ExternalId  string      `json:"externalId"`
-	Name        UserName    `json:"name"`
-	DisplayName string      `json:"displayName"`
-	UserName    string      `json:"userName"`
+	Schemas       []string    `json:"schemas"`
+	SshPublicKeys []string    `json:"sshPublicKey"`
+	Active        bool        `json:"active"`
+	Emails        []UserEmail `json:"emails"`
+	ExternalId    string      `json:"externalId"`
+	Name          UserName    `json:"name"`
+	DisplayName   string      `json:"displayName"`
+	UserName      string      `json:"userName"`
 }
 
 // TODO(josegomezr): Expand on the property mappings side and here what do we
