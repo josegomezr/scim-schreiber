@@ -7,6 +7,7 @@ import (
 	ldap "github.com/go-ldap/ldap/v3"
 	"github.com/josegomezr/scim-schreiber-ldap/internal/scim"
 	"iter"
+	"log"
 	"log/slog"
 	"net/http"
 	"os"
@@ -15,7 +16,7 @@ import (
 )
 
 func CastSingleValue[T any](input interface{}) T {
-	output, ok := input.(T)
+	output, _ := input.(T)
 	return output
 }
 
@@ -54,7 +55,13 @@ func ldapEntryToGroupResponse(entry *ldap.Entry) *scim.GroupRespOK {
 			Value: value,
 		})
 	}
+
+	// TODO: Id's need something more qualifies, maybe we can use the UUID
+	// generated in the IDP
+	//
+	// If not we should fallback to DN's everywhere.
 	return &scim.GroupRespOK{
+		Id:          entry.GetAttributeValue("cn"),
 		ExternalId:  entry.DN,
 		DisplayName: entry.GetAttributeValue("cn"),
 		Members:     members,
@@ -62,35 +69,17 @@ func ldapEntryToGroupResponse(entry *ldap.Entry) *scim.GroupRespOK {
 }
 
 func searchGroups(uid string, field string) (iter.Seq2[*ldap.Entry, error], error) {
-	endpoint := os.Getenv("LDAP_URL")
-	bindDn := os.Getenv("LDAP_BIND_DN")
-	bindPw := os.Getenv("LDAP_BIND_PW")
-
-	conn, err := connectAndBind(endpoint, bindDn, bindPw)
-	if err != nil {
-		return nil, err
-	}
-
 	filter := fmt.Sprintf("(%s=%s)", field, uid)
 
 	baseUid := os.Getenv("LDAP_BASE_GROUP_OU") + "," + os.Getenv("LDAP_BASE_DN")
-	return ldapSearchIter(conn, filter, baseUid), nil
+	return ldapSearchIter(LDAP_CONN, filter, baseUid), nil
 }
 
 func searchUsers(uid string, field string) (iter.Seq2[*ldap.Entry, error], error) {
-	endpoint := os.Getenv("LDAP_URL")
-	bindDn := os.Getenv("LDAP_BIND_DN")
-	bindPw := os.Getenv("LDAP_BIND_PW")
-
-	conn, err := connectAndBind(endpoint, bindDn, bindPw)
-	if err != nil {
-		return nil, err
-	}
-
 	filter := fmt.Sprintf("(%s=%s)", field, uid)
 
 	baseUid := os.Getenv("LDAP_BASE_USER_OU") + "," + os.Getenv("LDAP_BASE_DN")
-	return ldapSearchIter(conn, filter, baseUid), nil
+	return ldapSearchIter(LDAP_CONN, filter, baseUid), nil
 }
 
 func _searchUser(uid string, field string) *ldap.Entry {
@@ -123,16 +112,22 @@ type Config struct {
 }
 
 func main() {
+	ldapEndpoint := os.Getenv("LDAP_URL")
+	ldapBindDn := os.Getenv("LDAP_BIND_DN")
+	ldapBindPw := os.Getenv("LDAP_BIND_PW")
+
 	cfg := Config{
 		AllowUserCreation:     false,
 		GroupCreationIsUpsert: true,
 	}
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("GET /-/startup", func(w http.ResponseWriter, r *http.Request) {
-		// TODO(josegomezr): Test LDAP Connectivity here
-		w.WriteHeader(200)
-	})
+	conn, err := connectAndBind(ldapEndpoint, ldapBindDn, ldapBindPw)
+	if err != nil {
+		log.Fatalf("BORKED, LDAP NOT WORKING: %s", err)
+	}
+
+	LDAP_CONN = conn
 
 	mux.HandleFunc("GET /-/live", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
@@ -310,6 +305,9 @@ func main() {
 				return
 			}
 		}
+
+		w.WriteHeader(401)
+		return
 	})
 
 	mux.HandleFunc("GET /v2/Groups/{group_id}", func(w http.ResponseWriter, r *http.Request) {
@@ -397,29 +395,18 @@ func main() {
 				}
 			}
 
-			fmt.Println("dn:", entry.DN)
-			fmt.Println("changeType:", "modify")
-			for k, vals := range adds {
-				for _, v := range vals {
-					fmt.Println("add:", k)
-					fmt.Println(k, v)
-				}
-			}
-			fmt.Println("-")
-			for k, vals := range removes {
-				for _, v := range vals {
-					fmt.Println("delete:", k)
-					fmt.Println(k, v)
-				}
-			}
-			fmt.Println("-")
-			for k, v := range replaces {
-				fmt.Println("replace:", k)
-				fmt.Println(k, v)
-			}
-			w.WriteHeader(200)
-			json.NewEncoder(w).Encode(nil)
+			transformMemberUUIDtoUID(adds["members"])
+			transformMemberUUIDtoUID(removes["members"])
 
+			err := updateEntry(entry.DN, adds, removes, replaces)
+
+			if err != nil {
+				w.WriteHeader(401)
+				return
+			}
+
+			w.WriteHeader(200)
+			fmt.Fprintf(w, "{}")
 			return
 		}
 
@@ -446,4 +433,35 @@ func main() {
 	fmt.Println("Listening")
 	// TODO(josegomezr): configurable ports here
 	http.ListenAndServe(":9440", mux)
+}
+
+func transformMemberUUIDtoUID(uuids []string) {
+	if uuids == nil {
+		return
+	}
+
+	for k, userUuid := range uuids {
+		if lookup := searchUserByUUID(userUuid); lookup != nil {
+			uuids[k] = lookup.GetAttributeValue("uid")
+		}
+	}
+}
+
+func updateEntry(dn string, adds map[string][]string, removes map[string][]string, replaces map[string]string) error {
+	endpoint := os.Getenv("LDAP_URL")
+	bindDn := os.Getenv("LDAP_BIND_DN")
+	bindPw := os.Getenv("LDAP_BIND_PW")
+
+	request := ldap.NewModifyRequest(dn, nil)
+	for k, vals := range adds {
+		request.Add(k, vals)
+	}
+	for k, vals := range removes {
+		request.Delete(k, vals)
+	}
+	for k, v := range replaces {
+		request.Replace(k, []string{v})
+	}
+
+	return LDAP_CONN.Modify(request)
 }

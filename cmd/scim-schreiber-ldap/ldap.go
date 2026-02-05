@@ -131,3 +131,5 @@ func ldapFind(conn *ldap.Conn, dn string) (*ldap.Entry, error) {
 	}
 	return sr.Entries[0], nil
 }
+
+var LDAP_CONN *ldap.Conn

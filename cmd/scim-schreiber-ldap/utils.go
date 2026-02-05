@@ -17,7 +17,7 @@ func NewServiceProviderConfig() *scim.ServiceProviderConfig {
 			Supported: false,
 		},
 		Patch: scim.ServiceProviderSuportObj{
-			Supported: false,
+			Supported: true,
 		},
 		Bulk: scim.ServiceProviderSuportObj{
 			Supported: false,

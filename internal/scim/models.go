@@ -63,6 +63,7 @@ type UserRespOK struct {
 }
 
 type GroupRespOK struct {
+	Id          string     `json:"id"`
 	ExternalId  string     `json:"externalId"`
 	DisplayName string     `json:"displayName"`
 	Members     []ValueObj `json:"members"`
