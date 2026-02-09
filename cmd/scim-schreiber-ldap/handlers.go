@@ -16,6 +16,19 @@ type LDAPHandler struct {
 	cfg  *Config
 }
 
+func (l *LDAPHandler) ConnectMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := setupLdap()
+		if err != nil {
+			w.WriteHeader(500)
+			return
+		}
+		defer conn.Close()
+		l.conn = conn
+		next.ServeHTTP(w, r)
+	})
+}
+
 func (l *LDAPHandler) ServiceProviderConfigHandler(w http.ResponseWriter, r *http.Request) {
 	slog.Info("GET /v2/ServiceProviderConfig")
 	json.NewEncoder(w).Encode(NewServiceProviderConfig())
@@ -31,7 +44,7 @@ func (l *LDAPHandler) CreateUserHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	slog.Info("POST /v2/Users", "request", obj)
-	if searchUser(obj.UserName) != nil {
+	if searchUser(l.conn, obj.UserName) != nil {
 		w.WriteHeader(http.StatusConflict)
 		return
 	}
@@ -62,7 +75,7 @@ func (l *LDAPHandler) ListUsersHandler(w http.ResponseWriter, r *http.Request) {
 	resp := scim.UserFilterResponse{}
 	resp.Resources = make([]scim.UserRespOK, 0)
 
-	users, err := searchUsers(uid, "uid")
+	users, err := searchUsers(l.conn, uid, "uid")
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprintln(w, "{}")
@@ -88,7 +101,7 @@ func (l *LDAPHandler) GetUserHandler(w http.ResponseWriter, r *http.Request) {
 	userUuid := r.PathValue("user_uuid")
 	slog.Info("GET /v2/Users/", "userUuid", userUuid)
 
-	users, err := searchUsers(userUuid, "uuid")
+	users, err := searchUsers(l.conn, userUuid, "uuid")
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprintln(w, "{}")
@@ -120,7 +133,7 @@ func (l *LDAPHandler) UpdateUserHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if entry := searchUserByUUID(userId); entry != nil {
+	if entry := searchUserByUUID(l.conn, userId); entry != nil {
 		slog.Info("Found user", "entry", entry)
 
 		// TODO(josegomezr): change more details
@@ -129,7 +142,7 @@ func (l *LDAPHandler) UpdateUserHandler(w http.ResponseWriter, r *http.Request) 
 			"cn":           []string{obj.DisplayName},
 			"sshPublicKey": obj.SshPublicKeys,
 		}
-		err := updateEntry(LDAP_CONN, entry.DN, nil, nil, replaces)
+		err := updateEntry(l.conn, entry.DN, nil, nil, replaces)
 
 		if err != nil {
 			slog.Error("Error updating entry", "error", err)
@@ -153,7 +166,7 @@ func (l *LDAPHandler) UpdateUserHandler(w http.ResponseWriter, r *http.Request) 
 func (l *LDAPHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	userId := r.PathValue("user_id")
 	fmt.Println("DELETE /v2/Users", userId)
-	if u := searchUserByUUID(userId); u != nil {
+	if u := searchUserByUUID(l.conn, userId); u != nil {
 		// delete the user
 		return
 	}
@@ -179,7 +192,7 @@ func (l *LDAPHandler) CreateGroupHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	entries, err := searchGroups(obj.DisplayName, "cn")
+	entries, err := searchGroups(l.conn, obj.DisplayName, "cn")
 	if err != nil {
 		w.WriteHeader(400)
 		return
@@ -209,7 +222,7 @@ func (l *LDAPHandler) GetGroupHandler(w http.ResponseWriter, r *http.Request) {
 	groupId := r.PathValue("group_id")
 	slog.Info("GET /v2/Groups", "groupId", groupId)
 
-	entries, err := searchGroups(groupId, "cn")
+	entries, err := searchGroups(l.conn, groupId, "cn")
 	if err != nil {
 		w.WriteHeader(400)
 		return
@@ -242,7 +255,7 @@ func (l *LDAPHandler) UpdateGroupHandler(w http.ResponseWriter, r *http.Request)
 	}
 	slog.Info("PATCH /v2/Groups", "obj", obj)
 
-	entries, err := searchGroups(groupId, "cn")
+	entries, err := searchGroups(l.conn, groupId, "cn")
 	if err != nil {
 		w.WriteHeader(400)
 		return
@@ -255,10 +268,10 @@ func (l *LDAPHandler) UpdateGroupHandler(w http.ResponseWriter, r *http.Request)
 		}
 
 		adds, removes, replaces := classifyPatchOperations(obj.Operations)
-		transformMemberUUIDtoUID(adds, "members", "memberUid")
-		transformMemberUUIDtoUID(removes, "members", "memberUid")
+		l.transformMemberUUIDtoUID(adds, "members", "memberUid")
+		l.transformMemberUUIDtoUID(removes, "members", "memberUid")
 
-		err := updateEntry(LDAP_CONN, entry.DN, adds, removes, replaces)
+		err := updateEntry(l.conn, entry.DN, adds, removes, replaces)
 
 		if err != nil {
 			w.WriteHeader(401)
@@ -282,7 +295,7 @@ func (l *LDAPHandler) UpdateGroupHandler(w http.ResponseWriter, r *http.Request)
 func (l *LDAPHandler) DeleteGroup(w http.ResponseWriter, r *http.Request) {
 	userId := r.PathValue("user_id")
 	fmt.Println("DELETE /v2/Groups", userId)
-	if u := searchUserByUUID(userId); u != nil {
+	if u := searchUserByUUID(l.conn, userId); u != nil {
 		// delete the user
 		return
 	}
@@ -291,7 +304,7 @@ func (l *LDAPHandler) DeleteGroup(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(w, "{}")
 }
 
-func transformMemberUUIDtoUID(attrmap map[string][]string, source string, dest string) {
+func (l *LDAPHandler) transformMemberUUIDtoUID(attrmap map[string][]string, source string, dest string) {
 	if attrmap[source] == nil {
 		return
 	}
@@ -301,7 +314,7 @@ func transformMemberUUIDtoUID(attrmap map[string][]string, source string, dest s
 	}
 
 	for _, userUuid := range attrmap[source] {
-		if lookup := searchUserByUUID(userUuid); lookup != nil {
+		if lookup := searchUserByUUID(l.conn, userUuid); lookup != nil {
 			attrmap[dest] = append(attrmap[dest], lookup.GetAttributeValue("uid"))
 		}
 	}

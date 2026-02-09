@@ -133,18 +133,16 @@ func ldapFind(conn *ldap.Conn, dn string) (*ldap.Entry, error) {
 	return sr.Entries[0], nil
 }
 
-func setupLdap() error {
+func setupLdap() (*ldap.Conn, error) {
 	ldapEndpoint := os.Getenv("LDAP_URL")
 	ldapBindDn := os.Getenv("LDAP_BIND_DN")
 	ldapBindPw := os.Getenv("LDAP_BIND_PW")
 
 	conn, err := connectAndBind(ldapEndpoint, ldapBindDn, ldapBindPw)
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	LDAP_CONN = conn
-	return nil
+	return conn, nil
 }
 
 func updateEntry(conn *ldap.Conn, dn string, adds map[string][]string, removes map[string][]string, replaces map[string][]string) error {
@@ -171,24 +169,22 @@ func updateEntry(conn *ldap.Conn, dn string, adds map[string][]string, removes m
 	return conn.Modify(request)
 }
 
-var LDAP_CONN *ldap.Conn
-
-func searchGroups(uid string, field string) (iter.Seq2[*ldap.Entry, error], error) {
+func searchGroups(conn *ldap.Conn, uid string, field string) (iter.Seq2[*ldap.Entry, error], error) {
 	filter := fmt.Sprintf("(%s=%s)", field, uid)
 
 	baseUid := os.Getenv("LDAP_BASE_GROUP_OU") + "," + os.Getenv("LDAP_BASE_DN")
-	return ldapSearchIter(LDAP_CONN, filter, baseUid), nil
+	return ldapSearchIter(conn, filter, baseUid), nil
 }
 
-func searchUsers(uid string, field string) (iter.Seq2[*ldap.Entry, error], error) {
+func searchUsers(conn *ldap.Conn, uid string, field string) (iter.Seq2[*ldap.Entry, error], error) {
 	filter := fmt.Sprintf("(%s=%s)", field, uid)
 
 	baseUid := os.Getenv("LDAP_BASE_USER_OU") + "," + os.Getenv("LDAP_BASE_DN")
-	return ldapSearchIter(LDAP_CONN, filter, baseUid), nil
+	return ldapSearchIter(conn, filter, baseUid), nil
 }
 
-func _searchUser(uid string, field string) *ldap.Entry {
-	users, err := searchUsers(uid, field)
+func _searchUser(conn *ldap.Conn, uid string, field string) *ldap.Entry {
+	users, err := searchUsers(conn, uid, field)
 	if err != nil {
 		return nil
 	}
@@ -203,10 +199,10 @@ func _searchUser(uid string, field string) *ldap.Entry {
 	return nil
 }
 
-func searchUser(uid string) *ldap.Entry {
-	return _searchUser(uid, "uid")
+func searchUser(conn *ldap.Conn, uid string) *ldap.Entry {
+	return _searchUser(conn, uid, "uid")
 }
 
-func searchUserByUUID(uid string) *ldap.Entry {
-	return _searchUser(uid, "uuid")
+func searchUserByUUID(conn *ldap.Conn, uid string) *ldap.Entry {
+	return _searchUser(conn, uid, "uuid")
 }

@@ -17,9 +17,11 @@ func main() {
 		GroupCreationIsUpsert: true,
 	}
 
-	if err := setupLdap(); err != nil {
+	conn, err := setupLdap()
+	if err != nil {
 		log.Fatalf("BORKED, LDAP NOT WORKING: %s", err)
 	}
+	conn.Close()
 
 	mux := http.NewServeMux()
 
@@ -28,8 +30,7 @@ func main() {
 	})
 
 	l := LDAPHandler{
-		conn: LDAP_CONN,
-		cfg:  &cfg,
+		cfg: &cfg,
 	}
 
 	mux.HandleFunc("GET /v2/ServiceProviderConfig", l.ServiceProviderConfigHandler)
@@ -46,5 +47,5 @@ func main() {
 	listenAddr := ":9440"
 	slog.Info("Listening", "listenAddr", listenAddr)
 	// TODO(josegomezr): configurable ports here
-	http.ListenAndServe(listenAddr, mux)
+	http.ListenAndServe(listenAddr, l.ConnectMiddleware(mux))
 }
