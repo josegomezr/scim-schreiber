@@ -2,11 +2,16 @@ package main
 
 import (
 	"fmt"
-	ldap "github.com/go-ldap/ldap/v3"
 	"iter"
 	"log/slog"
 	"os"
+
+	ldap "github.com/go-ldap/ldap/v3"
 )
+
+type LdapUtil struct {
+	conn *ldap.Conn
+}
 
 func connectAndBind(endpoint, bindDn, bindPw string) (*ldap.Conn, error) {
 	l, err := ldap.DialURL(endpoint)
@@ -19,46 +24,45 @@ func connectAndBind(endpoint, bindDn, bindPw string) (*ldap.Conn, error) {
 	return l, nil
 }
 
-func connectAndSearch(filter string) ([]*ldap.Entry, error) {
-	endpoint := os.Getenv("LDAP_URL")
-	bindDn := os.Getenv("LDAP_BIND_DN")
-	bindPw := os.Getenv("LDAP_BIND_PW")
+func setupLdap() (*ldap.Conn, error) {
+	ldapEndpoint := os.Getenv("LDAP_URL")
+	ldapBindDn := os.Getenv("LDAP_BIND_DN")
+	ldapBindPw := os.Getenv("LDAP_BIND_PW")
 
-	conn, err := connectAndBind(endpoint, bindDn, bindPw)
+	conn, err := connectAndBind(ldapEndpoint, ldapBindDn, ldapBindPw)
 	if err != nil {
-		slog.Error("failed binding to LDAP", "endpoint", endpoint, "dn", bindDn, "error", err)
 		return nil, err
 	}
-	defer conn.Close()
-	return ldapSearch(conn, filter)
+	return conn, nil
 }
 
-func ldapSearch(conn *ldap.Conn, filter string) ([]*ldap.Entry, error) {
-	var baseUid string = os.Getenv("LDAP_BASE_DN")
-	slog.Info("LDAP Search", "baseUid", baseUid, "filter", filter)
-	// TODO: paginate
+func (l *LdapUtil) getByDN(dn string) (*ldap.Entry, error) {
 	searchRequest := ldap.NewSearchRequest(
-		baseUid, // The base dn to search
-		ldap.ScopeWholeSubtree,
+		dn,
+		ldap.ScopeBaseObject,
 		ldap.NeverDerefAliases,
-		0,
+		1,
 		0,
 		false,
-		filter, // The filter to apply
-		nil,    // A list attributes to retrieve
+		"",  // The filter to apply
+		nil, // A list attributes to retrieve
 		nil,
 	)
 
-	// TODO(josegomezr): make this an iterator, so it processes pages at a time instead of pulling all records into ram.
-	sr, err := conn.SearchWithPaging(searchRequest, 1000)
+	searchResult, err := l.conn.Search(searchRequest)
 	if err != nil {
-		slog.Error("failed searching", "filter", filter, "error", err)
+		slog.Error("Failed to execute search request", "err", err)
 		return nil, err
 	}
-	return sr.Entries, nil
+
+	if len(searchResult.Entries) != 1 {
+		return nil, fmt.Errorf("search returned %d results, expected 1", len(searchResult.Entries))
+	}
+
+	return searchResult.Entries[0], nil
 }
 
-func ldapSearchIter(conn *ldap.Conn, filter string, baseUid string) iter.Seq2[*ldap.Entry, error] {
+func (l *LdapUtil) SearchIter(filter string, baseUid string) iter.Seq2[*ldap.Entry, error] {
 	slog.Info("LDAP Search (iterator)", "baseUid", baseUid, "filter", filter)
 
 	pagingControl := ldap.NewControlPaging(1000)
@@ -78,7 +82,7 @@ func ldapSearchIter(conn *ldap.Conn, filter string, baseUid string) iter.Seq2[*l
 				nil,    // A list attributes to retrieve
 				controls,
 			)
-			response, err := conn.Search(searchRequest)
+			response, err := l.conn.Search(searchRequest)
 
 			if err != nil {
 				slog.Error("Failed to execute search request", "err", err)
@@ -107,45 +111,7 @@ func ldapSearchIter(conn *ldap.Conn, filter string, baseUid string) iter.Seq2[*l
 	}
 }
 
-func ldapFind(conn *ldap.Conn, dn string) (*ldap.Entry, error) {
-	slog.Info("LDAP Find by DN", "dn", dn)
-	// TODO: paginate
-	searchRequest := ldap.NewSearchRequest(
-		dn,
-		ldap.ScopeBaseObject,
-		ldap.NeverDerefAliases,
-		0,
-		0,
-		false,
-		"(objectclass=*)",
-		nil, // A list attributes to retrieve
-		nil,
-	)
-
-	sr, err := conn.Search(searchRequest)
-	if err != nil {
-		slog.Error("failed searching", "dn", dn, "error", err)
-		return nil, err
-	}
-	if len(sr.Entries) == 0 {
-		return nil, nil
-	}
-	return sr.Entries[0], nil
-}
-
-func setupLdap() (*ldap.Conn, error) {
-	ldapEndpoint := os.Getenv("LDAP_URL")
-	ldapBindDn := os.Getenv("LDAP_BIND_DN")
-	ldapBindPw := os.Getenv("LDAP_BIND_PW")
-
-	conn, err := connectAndBind(ldapEndpoint, ldapBindDn, ldapBindPw)
-	if err != nil {
-		return nil, err
-	}
-	return conn, nil
-}
-
-func updateEntry(conn *ldap.Conn, dn string, adds map[string][]string, removes map[string][]string, replaces map[string][]string) error {
+func (l *LdapUtil) UpdateEntry(dn string, adds map[string][]string, removes map[string][]string, replaces map[string][]string) error {
 	request := ldap.NewModifyRequest(dn, nil)
 
 	if adds != nil {
@@ -166,25 +132,54 @@ func updateEntry(conn *ldap.Conn, dn string, adds map[string][]string, removes m
 	fmt.Printf("adds: %+v\n", adds)
 	fmt.Printf("removes: %+v\n", removes)
 	fmt.Printf("replaces: %+v\n", replaces)
-	return conn.Modify(request)
+	return l.conn.Modify(request)
 }
 
-func searchGroups(conn *ldap.Conn, uid string, field string) (iter.Seq2[*ldap.Entry, error], error) {
+func (l *LdapUtil) searchGroups(uid string, field string) (iter.Seq2[*ldap.Entry, error], error) {
 	filter := fmt.Sprintf("(%s=%s)", field, uid)
-
 	baseUid := os.Getenv("LDAP_BASE_GROUP_OU") + "," + os.Getenv("LDAP_BASE_DN")
-	return ldapSearchIter(conn, filter, baseUid), nil
+	return l.SearchIter(filter, baseUid), nil
 }
 
-func searchUsers(conn *ldap.Conn, uid string, field string) (iter.Seq2[*ldap.Entry, error], error) {
+func (l *LdapUtil) searchUsers(uid string, field string) (iter.Seq2[*ldap.Entry, error], error) {
 	filter := fmt.Sprintf("(%s=%s)", field, uid)
 
 	baseUid := os.Getenv("LDAP_BASE_USER_OU") + "," + os.Getenv("LDAP_BASE_DN")
-	return ldapSearchIter(conn, filter, baseUid), nil
+	return l.SearchIter(filter, baseUid), nil
 }
 
-func _searchUser(conn *ldap.Conn, uid string, field string) *ldap.Entry {
-	users, err := searchUsers(conn, uid, field)
+func (l *LdapUtil) CountUsers() (int, error) {
+	iterator, err := l.searchUsers("*", "uid")
+
+	if err != nil {
+		return 0, err
+	}
+
+	count := 0
+	for range iterator {
+		count++
+	}
+
+	return count, nil
+}
+
+func (l *LdapUtil) CountGroups() (int, error) {
+	iterator, err := l.searchGroups("*", "cn")
+
+	if err != nil {
+		return 0, err
+	}
+
+	count := 0
+	for range iterator {
+		count++
+	}
+
+	return count, nil
+}
+
+func (l *LdapUtil) _searchUser(uid string, field string) *ldap.Entry {
+	users, err := l.searchUsers(uid, field)
 	if err != nil {
 		return nil
 	}
@@ -199,10 +194,10 @@ func _searchUser(conn *ldap.Conn, uid string, field string) *ldap.Entry {
 	return nil
 }
 
-func searchUser(conn *ldap.Conn, uid string) *ldap.Entry {
-	return _searchUser(conn, uid, "uid")
+func (l *LdapUtil) searchUser(uid string) *ldap.Entry {
+	return l._searchUser(uid, "uid")
 }
 
-func searchUserByUUID(conn *ldap.Conn, uid string) *ldap.Entry {
-	return _searchUser(conn, uid, "uuid")
+func (l *LdapUtil) searchUserByUUID(uid string) *ldap.Entry {
+	return l._searchUser(uid, "uuid")
 }
