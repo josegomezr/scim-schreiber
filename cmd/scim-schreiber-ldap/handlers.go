@@ -6,13 +6,12 @@ import (
 
 func (l *LdapUtil) ConnectMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		conn, err := setupLdap()
+		err := l.connect()
 		if err != nil {
 			w.WriteHeader(500)
 			return
 		}
-		defer conn.Close()
-		l.conn = conn
+		defer l.disconnect()
 		next.ServeHTTP(w, r)
 	})
 }

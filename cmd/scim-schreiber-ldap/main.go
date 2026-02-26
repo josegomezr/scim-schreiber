@@ -4,6 +4,7 @@ import (
 	"log"
 	"log/slog"
 	"net/http"
+	"os"
 
 	"github.com/elimity-com/scim"
 	"github.com/elimity-com/scim/optional"
@@ -21,11 +22,21 @@ func main() {
 		GroupCreationIsUpsert: true,
 	}
 
-	conn, err := setupLdap()
+	l := LdapUtil{
+		conn:         nil,
+		ldapEndpoint: os.Getenv("LDAP_URL"),
+		ldapBindDn:   os.Getenv("LDAP_BIND_DN"),
+		ldapBindPw:   os.Getenv("LDAP_BIND_PW"),
+		baseUserOu:   os.Getenv("LDAP_BASE_USER_OU"),
+		baseDn:       os.Getenv("LDAP_BASE_DN"),
+		baseGroupOu:  os.Getenv("LDAP_BASE_GROUP_OU"),
+	}
+
+	err := l.connect()
 	if err != nil {
 		log.Fatalf("BORKED, LDAP NOT WORKING: %s", err)
 	}
-	conn.Close()
+	l.disconnect()
 
 	config := scim.ServiceProviderConfig{
 		AuthenticationSchemes: []scim.AuthenticationScheme{
@@ -37,8 +48,6 @@ func main() {
 		SupportFiltering: true,
 		SupportPatch:     true,
 	}
-
-	l := LdapUtil{}
 
 	resourceTypes := []scim.ResourceType{
 		{

@@ -4,36 +4,37 @@ import (
 	"fmt"
 	"iter"
 	"log/slog"
-	"os"
 
 	ldap "github.com/go-ldap/ldap/v3"
 )
 
 type LdapUtil struct {
-	conn *ldap.Conn
+	conn         *ldap.Conn
+	ldapEndpoint string
+	ldapBindDn   string
+	ldapBindPw   string
+	baseUserOu   string
+	baseGroupOu  string
+	baseDn       string
 }
 
-func connectAndBind(endpoint, bindDn, bindPw string) (*ldap.Conn, error) {
-	l, err := ldap.DialURL(endpoint)
+func (l *LdapUtil) connect() error {
+	conn, err := ldap.DialURL(l.ldapEndpoint)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	if err := l.Bind(bindDn, bindPw); err != nil {
-		return nil, err
+	if err := conn.Bind(l.ldapBindDn, l.ldapBindPw); err != nil {
+		return err
 	}
-	return l, nil
+
+	l.conn = conn
+	return nil
 }
 
-func setupLdap() (*ldap.Conn, error) {
-	ldapEndpoint := os.Getenv("LDAP_URL")
-	ldapBindDn := os.Getenv("LDAP_BIND_DN")
-	ldapBindPw := os.Getenv("LDAP_BIND_PW")
-
-	conn, err := connectAndBind(ldapEndpoint, ldapBindDn, ldapBindPw)
-	if err != nil {
-		return nil, err
-	}
-	return conn, nil
+func (l *LdapUtil) disconnect() error {
+	err := l.conn.Close()
+	l.conn = nil
+	return err
 }
 
 func (l *LdapUtil) getByDN(dn string) (*ldap.Entry, error) {
@@ -137,14 +138,14 @@ func (l *LdapUtil) UpdateEntry(dn string, adds map[string][]string, removes map[
 
 func (l *LdapUtil) searchGroups(uid string, field string) (iter.Seq2[*ldap.Entry, error], error) {
 	filter := fmt.Sprintf("(%s=%s)", field, uid)
-	baseUid := os.Getenv("LDAP_BASE_GROUP_OU") + "," + os.Getenv("LDAP_BASE_DN")
+	baseUid := l.baseGroupOu + "," + l.baseDn
 	return l.SearchIter(filter, baseUid), nil
 }
 
 func (l *LdapUtil) searchUsers(uid string, field string) (iter.Seq2[*ldap.Entry, error], error) {
 	filter := fmt.Sprintf("(%s=%s)", field, uid)
 
-	baseUid := os.Getenv("LDAP_BASE_USER_OU") + "," + os.Getenv("LDAP_BASE_DN")
+	baseUid := l.baseUserOu + "," + l.baseDn
 	return l.SearchIter(filter, baseUid), nil
 }
 
