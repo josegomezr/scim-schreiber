@@ -14,8 +14,7 @@ import (
 )
 
 type GroupHandler struct {
-	ldap *LdapUtil
-	cfg  *Config
+	cfg *Config
 }
 
 // TODO(josegomezr): Groups don't self-heal after an 409 Conflict like
@@ -27,7 +26,16 @@ func (h GroupHandler) Create(r *http.Request, attributes scim.ResourceAttributes
 
 	slog.Info("Creating group", "request", attributes)
 
-	entries, err := h.ldap.searchGroups(attributes["displayName"].(string), "cn")
+	ldapCtx, ok := GetLDAPContext(r.Context())
+
+	if !ok {
+		slog.Warn("Failed to get LDAP context")
+		return scim.Resource{}, errors.ScimError{
+			Status: http.StatusInternalServerError,
+		}
+	}
+
+	entries, err := ldapCtx.searchGroups(attributes["displayName"].(string), "cn")
 
 	if err != nil {
 		return scim.Resource{}, errors.ScimErrorInternal
@@ -86,7 +94,16 @@ func (h GroupHandler) Delete(r *http.Request, id string) error {
 func (h GroupHandler) Get(r *http.Request, id string) (scim.Resource, error) {
 	slog.Info("GET group", "id", id)
 
-	entries, err := h.ldap.searchGroups(id, "cn")
+	ldapCtx, ok := GetLDAPContext(r.Context())
+
+	if !ok {
+		slog.Warn("Failed to get LDAP context")
+		return scim.Resource{}, errors.ScimError{
+			Status: http.StatusInternalServerError,
+		}
+	}
+
+	entries, err := ldapCtx.searchGroups(id, "cn")
 
 	if err != nil {
 		slog.Error("An error occurred while getting group", "id", id, "err", err)
@@ -106,8 +123,17 @@ func (h GroupHandler) Get(r *http.Request, id string) (scim.Resource, error) {
 }
 
 func (h GroupHandler) GetAll(r *http.Request, params scim.ListRequestParams) (scim.Page, error) {
+	ldapCtx, ok := GetLDAPContext(r.Context())
+
+	if !ok {
+		slog.Warn("Failed to get LDAP context")
+		return scim.Page{}, errors.ScimError{
+			Status: http.StatusInternalServerError,
+		}
+	}
+
 	if params.Count == 0 {
-		groupCount, err := h.ldap.CountGroups()
+		groupCount, err := ldapCtx.CountGroups()
 
 		if err != nil {
 			return scim.Page{}, errors.ScimErrorInternal
@@ -125,7 +151,7 @@ func (h GroupHandler) GetAll(r *http.Request, params scim.ListRequestParams) (sc
 		return scim.Page{}, err
 	}
 
-	groups, err := h.ldap.searchGroups("*", "cn")
+	groups, err := ldapCtx.searchGroups("*", "cn")
 
 	if err != nil {
 		return scim.Page{}, errors.ScimErrorInternal
@@ -161,7 +187,16 @@ func (h GroupHandler) GetAll(r *http.Request, params scim.ListRequestParams) (sc
 func (h GroupHandler) Patch(r *http.Request, id string, operations []scim.PatchOperation) (scim.Resource, error) {
 	slog.Info("PATCH group", "id", id)
 
-	entries, err := h.ldap.searchGroups(id, "cn")
+	ldapCtx, ok := GetLDAPContext(r.Context())
+
+	if !ok {
+		slog.Warn("Failed to get LDAP context")
+		return scim.Resource{}, errors.ScimError{
+			Status: http.StatusInternalServerError,
+		}
+	}
+
+	entries, err := ldapCtx.searchGroups(id, "cn")
 
 	if err != nil {
 		slog.Error("An error occurred while getting group", "id", id, "err", err)
@@ -175,17 +210,17 @@ func (h GroupHandler) Patch(r *http.Request, id string, operations []scim.PatchO
 		}
 
 		adds, removes, replaces := classifyPatchOperations(operations)
-		h.transformMemberUUIDtoUID(adds, "members", "memberUid")
-		h.transformMemberUUIDtoUID(removes, "members", "memberUid")
+		h.transformMemberUUIDtoUID(ldapCtx, adds, "members", "memberUid")
+		h.transformMemberUUIDtoUID(ldapCtx, removes, "members", "memberUid")
 
-		err := h.ldap.UpdateEntry(entry.DN, adds, removes, replaces)
+		err := ldapCtx.UpdateEntry(entry.DN, adds, removes, replaces)
 
 		if err != nil {
 			slog.Error("An error occurred while getting group", "id", id, "err", err)
 			return scim.Resource{}, errors.ScimErrorInternal
 		}
 
-		updatedEntry, err := h.ldap.getByDN(entry.DN)
+		updatedEntry, err := ldapCtx.getByDN(entry.DN)
 
 		if err != nil {
 			slog.Error("An error occurred while getting group", "id", id, "err", err)
@@ -202,7 +237,7 @@ func (h GroupHandler) Replace(r *http.Request, id string, attributes scim.Resour
 	return scim.Resource{}, errors.ScimError{Status: http.StatusNotImplemented}
 }
 
-func (h *GroupHandler) transformMemberUUIDtoUID(attrmap map[string][]string, source string, dest string) {
+func (h *GroupHandler) transformMemberUUIDtoUID(ldapCtx *LdapUtil, attrmap map[string][]string, source string, dest string) {
 	if attrmap[source] == nil {
 		return
 	}
@@ -212,7 +247,7 @@ func (h *GroupHandler) transformMemberUUIDtoUID(attrmap map[string][]string, sou
 	}
 
 	for _, userUuid := range attrmap[source] {
-		if lookup := h.ldap.searchUserByUUID(userUuid); lookup != nil {
+		if lookup := ldapCtx.searchUserByUUID(userUuid); lookup != nil {
 			attrmap[dest] = append(attrmap[dest], lookup.GetAttributeValue("uid"))
 		}
 	}

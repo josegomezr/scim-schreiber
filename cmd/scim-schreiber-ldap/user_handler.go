@@ -11,14 +11,22 @@ import (
 )
 
 type UserHandler struct {
-	ldap *LdapUtil
-	cfg  *Config
+	cfg *Config
 }
 
 func (h UserHandler) Create(r *http.Request, attributes scim.ResourceAttributes) (scim.Resource, error) {
 
 	slog.Info("POST /v2/Users", "request", attributes)
-	if h.ldap.searchUser(attributes["userName"].(string)) != nil {
+	ldapCtx, ok := GetLDAPContext(r.Context())
+
+	if !ok {
+		slog.Warn("Failed to get LDAP context")
+		return scim.Resource{}, errors.ScimError{
+			Status: http.StatusInternalServerError,
+		}
+	}
+
+	if ldapCtx.searchUser(attributes["userName"].(string)) != nil {
 		return scim.Resource{}, errors.ScimErrorUniqueness
 	}
 
@@ -41,7 +49,16 @@ func (h UserHandler) Create(r *http.Request, attributes scim.ResourceAttributes)
 func (h UserHandler) Delete(r *http.Request, id string) error {
 	slog.Info("DELETE /v2/Users", "id", id)
 
-	if u := h.ldap.searchUserByUUID(id); u != nil {
+	ldapCtx, ok := GetLDAPContext(r.Context())
+
+	if !ok {
+		slog.Warn("Failed to get LDAP context")
+		return errors.ScimError{
+			Status: http.StatusInternalServerError,
+		}
+	}
+
+	if u := ldapCtx.searchUserByUUID(id); u != nil {
 		// TODO delete the user
 	}
 
@@ -50,7 +67,16 @@ func (h UserHandler) Delete(r *http.Request, id string) error {
 
 func (h UserHandler) Get(r *http.Request, id string) (scim.Resource, error) {
 
-	entry := h.ldap.searchUserByUUID(id)
+	ldapCtx, ok := GetLDAPContext(r.Context())
+
+	if !ok {
+		slog.Warn("Failed to get LDAP context")
+		return scim.Resource{}, errors.ScimError{
+			Status: http.StatusInternalServerError,
+		}
+	}
+
+	entry := ldapCtx.searchUserByUUID(id)
 
 	if entry == nil {
 		return scim.Resource{}, errors.ScimErrorResourceNotFound(id)
@@ -60,8 +86,17 @@ func (h UserHandler) Get(r *http.Request, id string) (scim.Resource, error) {
 }
 
 func (h UserHandler) GetAll(r *http.Request, params scim.ListRequestParams) (scim.Page, error) {
+	ldapCtx, ok := GetLDAPContext(r.Context())
+
+	if !ok {
+		slog.Warn("Failed to get LDAP context")
+		return scim.Page{}, errors.ScimError{
+			Status: http.StatusInternalServerError,
+		}
+	}
+
 	if params.Count == 0 {
-		userCount, err := h.ldap.CountUsers()
+		userCount, err := ldapCtx.CountUsers()
 
 		if err != nil {
 			return scim.Page{}, errors.ScimErrorInternal
@@ -79,7 +114,7 @@ func (h UserHandler) GetAll(r *http.Request, params scim.ListRequestParams) (sci
 		return scim.Page{}, err
 	}
 
-	users, err := h.ldap.searchUsers("*", "uid")
+	users, err := ldapCtx.searchUsers("*", "uid")
 
 	if err != nil {
 		return scim.Page{}, errors.ScimErrorInternal
@@ -117,7 +152,16 @@ func (h UserHandler) Patch(r *http.Request, id string, operations []scim.PatchOp
 }
 
 func (h UserHandler) Replace(r *http.Request, id string, attributes scim.ResourceAttributes) (scim.Resource, error) {
-	entry := h.ldap.searchUserByUUID(id)
+	ldapCtx, ok := GetLDAPContext(r.Context())
+
+	if !ok {
+		slog.Warn("Failed to get LDAP context")
+		return scim.Resource{}, errors.ScimError{
+			Status: http.StatusInternalServerError,
+		}
+	}
+
+	entry := ldapCtx.searchUserByUUID(id)
 	if entry == nil {
 		return scim.Resource{}, errors.ScimErrorResourceNotFound(id)
 	}
@@ -131,7 +175,7 @@ func (h UserHandler) Replace(r *http.Request, id string, attributes scim.Resourc
 		"sshPublicKey": attributes["sshPublicKey"].([]string),
 	}
 
-	err := h.ldap.UpdateEntry(entry.DN, nil, nil, replaces)
+	err := ldapCtx.UpdateEntry(entry.DN, nil, nil, replaces)
 
 	if err != nil {
 		slog.Error("Error updating entry", "error", err)
@@ -139,7 +183,7 @@ func (h UserHandler) Replace(r *http.Request, id string, attributes scim.Resourc
 	}
 
 	// Get updated entry
-	entry = h.ldap.searchUserByUUID(id)
+	entry = ldapCtx.searchUserByUUID(id)
 	// return resource with replaced attributes
 	return ldapEntryToUserResource(entry), nil
 }

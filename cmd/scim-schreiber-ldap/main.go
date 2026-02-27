@@ -22,6 +22,39 @@ func main() {
 		GroupCreationIsUpsert: true,
 	}
 
+	testConnection()
+
+	server, err := createSCIMServer(cfg)
+
+	if err != nil {
+		slog.Error("Failed to create server", "err", err)
+		return
+	}
+
+	startHttpServer(server, err)
+}
+
+func startHttpServer(server scim.Server, err error) {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("GET /-/live", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+	})
+
+	mux.Handle("/", server)
+
+	listenAddr := ":9440"
+	slog.Info("Listening", "listenAddr", listenAddr)
+	// TODO(josegomezr): configurable ports here
+	err = http.ListenAndServe(listenAddr, LdapMiddleware(mux))
+
+	if err != nil {
+		slog.Error("Failed to start http server", "err", err)
+		return
+	}
+}
+
+func testConnection() {
 	l := LdapUtil{
 		conn:         nil,
 		ldapEndpoint: os.Getenv("LDAP_URL"),
@@ -37,7 +70,9 @@ func main() {
 		log.Fatalf("BORKED, LDAP NOT WORKING: %s", err)
 	}
 	l.disconnect()
+}
 
+func createSCIMServer(cfg Config) (scim.Server, error) {
 	config := scim.ServiceProviderConfig{
 		AuthenticationSchemes: []scim.AuthenticationScheme{
 			{
@@ -57,8 +92,7 @@ func main() {
 			Description: optional.NewString("User Account"),
 			Schema:      model.UserSchema,
 			Handler: UserHandler{
-				ldap: &l,
-				cfg:  &cfg,
+				cfg: &cfg,
 			},
 		},
 		{
@@ -68,8 +102,7 @@ func main() {
 			Description: optional.NewString("Groups"),
 			Schema:      model.GroupSchema,
 			Handler: GroupHandler{
-				ldap: &l,
-				cfg:  &cfg,
+				cfg: &cfg,
 			},
 		},
 	}
@@ -83,28 +116,5 @@ func main() {
 		scim.WithLogger(&ScimLogger{}), // optional, default is no logging
 	}
 
-	server, err := scim.NewServer(serverArgs, serverOpts...)
-
-	if err != nil {
-		slog.Error("Failed to create server", "err", err)
-		return
-	}
-
-	mux := http.NewServeMux()
-
-	mux.HandleFunc("GET /-/live", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(200)
-	})
-
-	mux.Handle("/", server)
-
-	listenAddr := ":9440"
-	slog.Info("Listening", "listenAddr", listenAddr)
-	// TODO(josegomezr): configurable ports here
-	err = http.ListenAndServe(listenAddr, l.ConnectMiddleware(mux))
-
-	if err != nil {
-		slog.Error("Failed to start http server", "err", err)
-		return
-	}
+	return scim.NewServer(serverArgs, serverOpts...)
 }
