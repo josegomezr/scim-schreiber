@@ -109,9 +109,11 @@ func (h UserHandler) GetAll(r *http.Request, params scim.ListRequestParams) (sci
 
 	resources := make([]scim.Resource, 0)
 
-	err := params.FilterValidator.Validate()
-	if err != nil {
-		return scim.Page{}, err
+	if params.FilterValidator != nil {
+		err := params.FilterValidator.Validate()
+		if err != nil {
+			return scim.Page{}, err
+		}
 	}
 
 	users, err := ldapCtx.searchUsers("*", "uid")
@@ -131,10 +133,12 @@ func (h UserHandler) GetAll(r *http.Request, params scim.ListRequestParams) (sci
 
 		if i >= params.StartIndex {
 			resource := ldapEntryToUserResource(entry)
-			err = params.FilterValidator.PassesFilter(resource.Attributes)
-			if err != nil {
-				slog.Info("An error occurred while validating filter", "err", err)
-				continue
+			if params.FilterValidator != nil {
+				err = params.FilterValidator.PassesFilter(resource.Attributes)
+				if err != nil {
+					slog.Info("An error occurred while validating filter", "err", err)
+					continue
+				}
 			}
 			resources = append(resources, resource)
 		}
@@ -192,5 +196,8 @@ func ldapEntryToUserResource(entry *ldap.Entry) scim.Resource {
 	return scim.Resource{
 		ID:         entry.GetAttributeValue("uuid"),
 		ExternalID: optional.NewString(entry.DN),
+		Attributes: map[string]interface{}{
+			"userName": entry.GetAttributeValue("uid"),
+		},
 	}
 }

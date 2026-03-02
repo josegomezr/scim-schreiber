@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"testing"
@@ -60,7 +61,7 @@ func (suite *SCIMUserTestSuite) SetupSuite() {
 		baseDn:       ldapContainer.BaseDN,
 		dialOpts: []ldap.DialOpt{
 			ldap.DialWithTLSConfig(&tls.Config{
-				InsecureSkipVerify: true, // TODO Configure
+				InsecureSkipVerify: true,
 			}),
 		},
 	}
@@ -141,12 +142,90 @@ func (suite *SCIMUserTestSuite) TestGetUser() {
        "schemas": [ "urn:ietf:params:model:schemas:core:2.0:User" ],
        "externalId":"CN=test,ou=people,dc=suse,dc=com",
        "id":"%[1]s",
+       "userName":"test",
        "meta": {
           "location": "Users/%[1]s",
           "resourceType":"User"
        }
 	}
     `, testUserUUID)
+
+	assert.JSONEq(t, want, got)
+	assert.Equal(t, http.StatusOK, response.Code)
+}
+
+func (suite *SCIMUserTestSuite) TestGetAllUsers() {
+	t := suite.T()
+
+	request, _ := http.NewRequest(http.MethodGet, "/Users", nil)
+	ctx := WithLDAPContext(request.Context(), suite.ldapCtx)
+	request = request.WithContext(ctx)
+
+	response := httptest.NewRecorder()
+	suite.server.ServeHTTP(response, request)
+
+	got := response.Body.String()
+	want := `
+ 	{
+  "Resources" : [ {
+    "externalId" : "uid=demo_user,ou=people,dc=suse,dc=com",
+    "id" : "",
+    "userName":"demo_user",
+    "meta" : {
+      "resourceType" : "User",
+      "location" : "Users/"
+    },
+    "schemas" : [ "urn:ietf:params:model:schemas:core:2.0:User" ]
+  }, {
+    "externalId" : "CN=test,ou=people,dc=suse,dc=com",
+    "id" : "2a19013f-6a7e-4293-8782-6275d43ca030",
+	"userName":"test",
+    "meta" : {
+      "resourceType" : "User",
+      "location" : "Users/2a19013f-6a7e-4293-8782-6275d43ca030"
+    },
+    "schemas" : [ "urn:ietf:params:model:schemas:core:2.0:User" ]
+  } ],
+  "itemsPerPage" : 100,
+  "schemas" : [ "urn:ietf:params:scim:api:messages:2.0:ListResponse" ],
+  "startIndex" : 1,
+  "totalResults" : 3
+}
+    `
+
+	assert.JSONEq(t, want, got)
+	assert.Equal(t, http.StatusOK, response.Code)
+}
+
+func (suite *SCIMUserTestSuite) TestFilterUsers() {
+	t := suite.T()
+
+	request, _ := http.NewRequest(http.MethodGet, "/Users?filter="+url.QueryEscape("userName eq \"test\""), nil)
+	ctx := WithLDAPContext(request.Context(), suite.ldapCtx)
+	request = request.WithContext(ctx)
+
+	response := httptest.NewRecorder()
+	suite.server.ServeHTTP(response, request)
+
+	got := response.Body.String()
+	want := `
+ 	{
+  "Resources" : [ {
+    "externalId" : "CN=test,ou=people,dc=suse,dc=com",
+    "id" : "2a19013f-6a7e-4293-8782-6275d43ca030",
+    "userName":"test",
+    "meta" : {
+      "resourceType" : "User",
+      "location" : "Users/2a19013f-6a7e-4293-8782-6275d43ca030"
+    },
+    "schemas" : [ "urn:ietf:params:model:schemas:core:2.0:User" ]
+  } ],
+  "itemsPerPage" : 100,
+  "schemas" : [ "urn:ietf:params:scim:api:messages:2.0:ListResponse" ],
+  "startIndex" : 1,
+  "totalResults" : 2
+}
+    `
 
 	assert.JSONEq(t, want, got)
 	assert.Equal(t, http.StatusOK, response.Code)
