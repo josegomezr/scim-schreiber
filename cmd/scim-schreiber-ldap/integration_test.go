@@ -197,6 +197,31 @@ func (suite *SCIMUserTestSuite) TestGetAllUsers() {
 	assert.Equal(t, http.StatusOK, response.Code)
 }
 
+func (suite *SCIMUserTestSuite) TestGetUserCount() {
+	t := suite.T()
+
+	request, _ := http.NewRequest(http.MethodGet, "/Users?count=0", nil)
+	ctx := WithLDAPContext(request.Context(), suite.ldapCtx)
+	request = request.WithContext(ctx)
+
+	response := httptest.NewRecorder()
+	suite.server.ServeHTTP(response, request)
+
+	got := response.Body.String()
+	want := `
+ 	{
+       "Resources":null,
+       "itemsPerPage":0,
+       "schemas": ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
+       "startIndex":1,
+       "totalResults":2
+    }
+    `
+
+	assert.JSONEq(t, want, got)
+	assert.Equal(t, http.StatusOK, response.Code)
+}
+
 func (suite *SCIMUserTestSuite) TestFilterUsers() {
 	t := suite.T()
 
