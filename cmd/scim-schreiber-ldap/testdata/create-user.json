@@ -1,0 +1,23 @@
+{
+  "communityUid": "josegomezr",
+  "employeeNumber": "76003026",
+  "name": {
+    "givenName": "Jose",
+    "familyName": "Gomez",
+    "formatted":"José Gómez"
+  },
+  "displayName": "change: José Gómez",
+  "id": "22084278-669c-58b1-910c-a0af5bce241a",
+  "active": true,
+  "email": "jose.gomez@suse.com",
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+  ],
+  "entitlements":[
+    "ent1",
+    "ent2"
+  ],
+  "uid": "jgomez",
+  "userName": "jgomez",
+  "uuid": "22084278-669c-58b1-910c-a0af5bce241a"
+}

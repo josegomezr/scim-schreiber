@@ -26,13 +26,18 @@ var UserSchema = schema.Schema{
 		})),
 		schema.SimpleCoreAttribute(schema.SimpleStringParams(schema.StringParams{
 			Name:        "sshPublicKey",
-			Required:    true,
+			Required:    false,
 			MultiValued: true,
 		})),
 		schema.SimpleCoreAttribute(schema.SimpleBooleanParams(schema.BooleanParams{
 			Name:     "active",
 			Required: true,
 		})),
+		schema.SimpleCoreAttribute(schema.SimpleStringParams(schema.StringParams{
+			Name:     "email",
+			Required: true,
+		})),
+		/* TODO Determine if we want one or multiple e-mails in schema
 		schema.ComplexCoreAttribute(schema.ComplexParams{
 			Name:        "emails",
 			Required:    true,
@@ -51,10 +56,12 @@ var UserSchema = schema.Schema{
 					Required: true,
 				}),
 			},
-		}),
+		}),*/
 		schema.SimpleCoreAttribute(schema.SimpleStringParams(schema.StringParams{
-			Name:     "externalId",
-			Required: true,
+			Name:       "externalId",
+			Required:   false,
+			Mutability: schema.AttributeMutabilityReadOnly(),
+			Returned:   schema.AttributeReturnedAlways(),
 		})),
 		schema.ComplexCoreAttribute(schema.ComplexParams{
 			Name:        "name",

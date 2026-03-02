@@ -116,7 +116,7 @@ func (h GroupHandler) Get(r *http.Request, id string) (scim.Resource, error) {
 			return scim.Resource{}, errors.ScimErrorInternal
 		}
 
-		return ldapEntryToUserResource(entry), nil
+		return ldapEntryToGroupResource(entry), nil
 	}
 
 	return scim.Resource{}, errors.ScimErrorResourceNotFound(id)

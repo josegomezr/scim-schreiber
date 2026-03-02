@@ -3,9 +3,10 @@ package main
 import (
 	"fmt"
 	"iter"
+	"log"
 	"log/slog"
 
-	ldap "github.com/go-ldap/ldap/v3"
+	"github.com/go-ldap/ldap/v3"
 )
 
 type LdapUtil struct {
@@ -16,10 +17,11 @@ type LdapUtil struct {
 	baseUserOu   string
 	baseGroupOu  string
 	baseDn       string
+	dialOpts     []ldap.DialOpt
 }
 
 func (l *LdapUtil) connect() error {
-	conn, err := ldap.DialURL(l.ldapEndpoint)
+	conn, err := ldap.DialURL(l.ldapEndpoint, l.dialOpts...)
 	if err != nil {
 		return err
 	}
@@ -29,6 +31,40 @@ func (l *LdapUtil) connect() error {
 
 	l.conn = conn
 	return nil
+}
+
+func (l *LdapUtil) CreateUser(username string, password string, uuid string) (string, error) {
+	dn := fmt.Sprintf("CN=%s,%s,%s", username, l.baseUserOu, l.baseDn)
+
+	addReq := ldap.NewAddRequest(dn, []ldap.Control{})
+	addReq.Attribute("objectClass", []string{"suseuser"})
+	addReq.Attribute("sn", []string{"Surname"})
+	addReq.Attribute("cn", []string{username})
+	addReq.Attribute("uid", []string{username})
+	addReq.Attribute("isActive", []string{"true"})
+	addReq.Attribute("employeeNumber", []string{"1234"})
+	addReq.Attribute("uuid", []string{uuid})
+
+	//addReq.Attribute("sAMAccountName", []string{"fooUser"})
+	/*addReq.Attribute("userAccountControl", []string{fmt.Sprintf("%d", 0x0202)})
+	addReq.Attribute("instanceType", []string{fmt.Sprintf("%d", 0x00000004)})
+	addReq.Attribute("userPrincipalName", []string{"fooUser@example.com"})
+	addReq.Attribute("accountExpires", []string{fmt.Sprintf("%d", 0x00000000)})*/
+
+	// addReq.Attributes = attrs
+
+	if err := l.conn.Add(addReq); err != nil {
+		log.Fatal("error adding user:", addReq, err)
+		return "", err
+	}
+
+	modifyReq := ldap.NewPasswordModifyRequest(dn, "", password)
+	_, err := l.conn.PasswordModify(modifyReq)
+	if err != nil {
+		log.Fatal("error setting user password:", err)
+	}
+
+	return dn, nil
 }
 
 func (l *LdapUtil) disconnect() error {
