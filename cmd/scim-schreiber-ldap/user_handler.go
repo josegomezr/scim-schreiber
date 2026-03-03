@@ -62,7 +62,9 @@ func (h UserHandler) Delete(r *http.Request, id string) error {
 		// TODO delete the user
 	}
 
-	return nil
+	return errors.ScimError{
+		Status: http.StatusNotImplemented,
+	}
 }
 
 func (h UserHandler) Get(r *http.Request, id string) (scim.Resource, error) {
@@ -152,7 +154,7 @@ func (h UserHandler) GetAll(r *http.Request, params scim.ListRequestParams) (sci
 }
 
 func (h UserHandler) Patch(r *http.Request, id string, operations []scim.PatchOperation) (scim.Resource, error) {
-	return scim.Resource{}, errors.ScimError{Status: http.StatusNotImplemented}
+	return scim.Resource{}, errors.ScimError{Status: http.StatusNotImplemented, Detail: "Patch is not implemented for users"}
 }
 
 func (h UserHandler) Replace(r *http.Request, id string, attributes scim.ResourceAttributes) (scim.Resource, error) {
@@ -174,9 +176,10 @@ func (h UserHandler) Replace(r *http.Request, id string, attributes scim.Resourc
 
 	// TODO(josegomezr): change more details
 	slog.Info("Updating user details.", "from", entry.GetAttributeValue("cn"), "to", attributes["displayName"])
+
 	replaces := map[string][]string{
 		"cn":           {attributes["displayName"].(string)},
-		"sshPublicKey": attributes["sshPublicKey"].([]string),
+		"sshPublicKey": getOptionalAttribute(attributes, "sshPublicKey", []string{}),
 	}
 
 	err := ldapCtx.UpdateEntry(entry.DN, nil, nil, replaces)
@@ -192,12 +195,23 @@ func (h UserHandler) Replace(r *http.Request, id string, attributes scim.Resourc
 	return ldapEntryToUserResource(entry), nil
 }
 
+func getOptionalAttribute[T any](attributes scim.ResourceAttributes, name string, fallback T) T {
+	value, ok := attributes[name]
+
+	if !ok {
+		return fallback
+	}
+
+	return value.(T)
+}
+
 func ldapEntryToUserResource(entry *ldap.Entry) scim.Resource {
 	return scim.Resource{
 		ID:         entry.GetAttributeValue("uuid"),
 		ExternalID: optional.NewString(entry.DN),
 		Attributes: map[string]interface{}{
-			"userName": entry.GetAttributeValue("uid"),
+			"userName":    entry.GetAttributeValue("uid"),
+			"displayName": entry.GetAttributeValue("cn"),
 		},
 	}
 }

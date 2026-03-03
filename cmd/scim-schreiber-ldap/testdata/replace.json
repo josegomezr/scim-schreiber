@@ -1,0 +1,14 @@
+{
+  "name": {
+    "givenName": "User",
+    "familyName": "Replace",
+    "formatted":"User Replace"
+  },
+  "displayName": "User Replace",
+  "active": true,
+  "email": "replace@suse.com",
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+  ],
+  "userName": "test"
+}

@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/elimity-com/scim"
@@ -72,10 +73,16 @@ func (suite *SCIMUserTestSuite) SetupSuite() {
 
 	suite.ldapCtx = ldapUtil
 
-	_, err = ldapUtil.CreateUser("test", "changeme", testUserUUID)
-	if err != nil {
-		require.NoError(suite.T(), err)
-	}
+}
+
+func (suite *SCIMUserTestSuite) BeforeTest(suiteName, testName string) {
+	_, err := suite.ldapCtx.CreateUser("test", "changeme", testUserUUID)
+	require.NoError(suite.T(), err)
+}
+
+func (suite *SCIMUserTestSuite) AfterTest(suiteName, testName string) {
+	err := suite.ldapCtx.DeleteUser("test")
+	require.NoError(suite.T(), err)
 }
 
 func (suite *SCIMUserTestSuite) TearDownSuite() {
@@ -107,6 +114,83 @@ func (suite *SCIMUserTestSuite) TestCreateUser() {
 	assert.Equal(t, http.StatusNotImplemented, response.Code)
 }
 
+func (suite *SCIMUserTestSuite) TestReplaceUser() {
+	t := suite.T()
+
+	file, err := os.Open(filepath.Join(".", "testdata", "replace.json"))
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, file.Close())
+	})
+
+	request, _ := http.NewRequest(http.MethodPut, "/Users/"+testUserUUID, file)
+	ctx := WithLDAPContext(request.Context(), suite.ldapCtx)
+	request = request.WithContext(ctx)
+
+	response := httptest.NewRecorder()
+	suite.server.ServeHTTP(response, request)
+
+	assert.Equal(t, http.StatusOK, response.Code)
+	got := response.Body.String()
+	want := `
+        {
+          "displayName":"User Replace",
+          "externalId": "uid=test,ou=people,dc=suse,dc=com",
+          "id": "2a19013f-6a7e-4293-8782-6275d43ca030",
+          "meta": {
+            "resourceType": "User",
+            "location": "Users/2a19013f-6a7e-4293-8782-6275d43ca030"
+          },
+          "schemas": [
+            "urn:ietf:params:model:schemas:core:2.0:User"
+          ],
+          "userName": "test"
+        }
+    `
+
+	assert.JSONEq(t, want, got)
+}
+
+func (suite *SCIMUserTestSuite) TestPatchUser() {
+	t := suite.T()
+
+	requestBody := `
+        {
+          "schemas": [
+            "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+          ],
+          "Operations": [
+             {
+               "op":"replace",
+               "path":"displayName",
+               "value":"Patched Name"
+             }
+          ]
+        }
+    `
+
+	request, _ := http.NewRequest(http.MethodPatch, "/Users/"+testUserUUID, strings.NewReader(requestBody))
+	ctx := WithLDAPContext(request.Context(), suite.ldapCtx)
+	request = request.WithContext(ctx)
+
+	response := httptest.NewRecorder()
+	suite.server.ServeHTTP(response, request)
+
+	assert.Equal(t, http.StatusNotImplemented, response.Code)
+	got := response.Body.String()
+	want := `
+        {
+          "status": "501",
+          "detail":"Patch is not implemented for users",
+          "schemas": [
+            "urn:ietf:params:scim:api:messages:2.0:Error"
+          ]
+        }
+    `
+
+	assert.JSONEq(t, want, got)
+}
+
 func (suite *SCIMUserTestSuite) TestLDAPMissing() {
 	t := suite.T()
 
@@ -116,10 +200,10 @@ func (suite *SCIMUserTestSuite) TestLDAPMissing() {
 
 	got := response.Body.String()
 	want := `
- 	{
+     {
        "schemas": [ "urn:ietf:params:scim:api:messages:2.0:Error" ],
        "status": "500"
-	}
+    }
     `
 
 	assert.JSONEq(t, want, got)
@@ -138,16 +222,17 @@ func (suite *SCIMUserTestSuite) TestGetUser() {
 
 	got := response.Body.String()
 	want := fmt.Sprintf(`
- 	{
+     {
        "schemas": [ "urn:ietf:params:model:schemas:core:2.0:User" ],
-       "externalId":"CN=test,ou=people,dc=suse,dc=com",
+       "externalId":"uid=test,ou=people,dc=suse,dc=com",
        "id":"%[1]s",
        "userName":"test",
+       "displayName": "Max Mustermann",
        "meta": {
           "location": "Users/%[1]s",
           "resourceType":"User"
        }
-	}
+    }
     `, testUserUUID)
 
 	assert.JSONEq(t, want, got)
@@ -166,8 +251,9 @@ func (suite *SCIMUserTestSuite) TestGetAllUsers() {
 
 	got := response.Body.String()
 	want := `
- 	{
+     {
   "Resources" : [ {
+    "displayName":"Demo User",
     "externalId" : "uid=demo_user,ou=people,dc=suse,dc=com",
     "id" : "",
     "userName":"demo_user",
@@ -177,9 +263,10 @@ func (suite *SCIMUserTestSuite) TestGetAllUsers() {
     },
     "schemas" : [ "urn:ietf:params:model:schemas:core:2.0:User" ]
   }, {
-    "externalId" : "CN=test,ou=people,dc=suse,dc=com",
+    "externalId" : "uid=test,ou=people,dc=suse,dc=com",
     "id" : "2a19013f-6a7e-4293-8782-6275d43ca030",
-	"userName":"test",
+    "userName":"test",
+    "displayName": "Max Mustermann",
     "meta" : {
       "resourceType" : "User",
       "location" : "Users/2a19013f-6a7e-4293-8782-6275d43ca030"
@@ -209,7 +296,7 @@ func (suite *SCIMUserTestSuite) TestGetUserCount() {
 
 	got := response.Body.String()
 	want := `
- 	{
+     {
        "Resources":null,
        "itemsPerPage":0,
        "schemas": ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
@@ -234,9 +321,10 @@ func (suite *SCIMUserTestSuite) TestFilterUsers() {
 
 	got := response.Body.String()
 	want := `
- 	{
+     {
   "Resources" : [ {
-    "externalId" : "CN=test,ou=people,dc=suse,dc=com",
+    "displayName": "Max Mustermann",
+    "externalId" : "uid=test,ou=people,dc=suse,dc=com",
     "id" : "2a19013f-6a7e-4293-8782-6275d43ca030",
     "userName":"test",
     "meta" : {

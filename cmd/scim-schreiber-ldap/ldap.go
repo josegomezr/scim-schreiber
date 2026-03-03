@@ -34,24 +34,16 @@ func (l *LdapUtil) connect() error {
 }
 
 func (l *LdapUtil) CreateUser(username string, password string, uuid string) (string, error) {
-	dn := fmt.Sprintf("CN=%s,%s,%s", username, l.baseUserOu, l.baseDn)
+	dn := fmt.Sprintf("uid=%s,%s,%s", username, l.baseUserOu, l.baseDn)
 
 	addReq := ldap.NewAddRequest(dn, []ldap.Control{})
 	addReq.Attribute("objectClass", []string{"suseuser"})
 	addReq.Attribute("sn", []string{"Surname"})
-	addReq.Attribute("cn", []string{username})
+	addReq.Attribute("cn", []string{"Max Mustermann"})
 	addReq.Attribute("uid", []string{username})
 	addReq.Attribute("isActive", []string{"true"})
 	addReq.Attribute("employeeNumber", []string{"1234"})
 	addReq.Attribute("uuid", []string{uuid})
-
-	//addReq.Attribute("sAMAccountName", []string{"fooUser"})
-	/*addReq.Attribute("userAccountControl", []string{fmt.Sprintf("%d", 0x0202)})
-	addReq.Attribute("instanceType", []string{fmt.Sprintf("%d", 0x00000004)})
-	addReq.Attribute("userPrincipalName", []string{"fooUser@example.com"})
-	addReq.Attribute("accountExpires", []string{fmt.Sprintf("%d", 0x00000000)})*/
-
-	// addReq.Attributes = attrs
 
 	if err := l.conn.Add(addReq); err != nil {
 		log.Fatal("error adding user:", addReq, err)
@@ -65,6 +57,13 @@ func (l *LdapUtil) CreateUser(username string, password string, uuid string) (st
 	}
 
 	return dn, nil
+}
+
+func (l *LdapUtil) DeleteUser(username string) error {
+	dn := fmt.Sprintf("uid=%s,%s,%s", username, l.baseUserOu, l.baseDn)
+	err := l.conn.Del(ldap.NewDelRequest(dn, []ldap.Control{}))
+
+	return err
 }
 
 func (l *LdapUtil) disconnect() error {

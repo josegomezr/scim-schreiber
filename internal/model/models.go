@@ -37,26 +37,6 @@ var UserSchema = schema.Schema{
 			Name:     "email",
 			Required: true,
 		})),
-		/* TODO Determine if we want one or multiple e-mails in schema
-		schema.ComplexCoreAttribute(schema.ComplexParams{
-			Name:        "emails",
-			Required:    true,
-			MultiValued: true,
-			SubAttributes: []schema.SimpleParams{
-				schema.SimpleBooleanParams(schema.BooleanParams{
-					Name:     "primary",
-					Required: true,
-				}),
-				schema.SimpleStringParams(schema.StringParams{
-					Name:     "type",
-					Required: true,
-				}),
-				schema.SimpleStringParams(schema.StringParams{
-					Name:     "value",
-					Required: true,
-				}),
-			},
-		}),*/
 		schema.SimpleCoreAttribute(schema.SimpleStringParams(schema.StringParams{
 			Name:       "externalId",
 			Required:   false,
@@ -66,7 +46,7 @@ var UserSchema = schema.Schema{
 		schema.ComplexCoreAttribute(schema.ComplexParams{
 			Name:        "name",
 			Required:    true,
-			MultiValued: true,
+			MultiValued: false,
 			SubAttributes: []schema.SimpleParams{
 				schema.SimpleStringParams(schema.StringParams{
 					Name:     "familyName",
