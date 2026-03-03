@@ -72,7 +72,7 @@ func ldapEntryToGroupResource(entry *ldap.Entry) scim.Resource {
 		ID:         entry.GetAttributeValue("cn"),
 		ExternalID: optional.NewString(entry.DN),
 		Attributes: map[string]interface{}{
-			"displayName": entry.GetAttributeValue("cn"),
+			"displayName": entry.GetAttributeValue("o"),
 			"members":     members,
 		},
 	}
@@ -88,7 +88,7 @@ func (h GroupHandler) Delete(r *http.Request, id string) error {
 
 	// TODO Implement
 
-	return nil
+	return errors.ScimError{Status: http.StatusNotImplemented, Detail: "Delete is not implemented"}
 }
 
 func (h GroupHandler) Get(r *http.Request, id string) (scim.Resource, error) {
@@ -146,9 +146,11 @@ func (h GroupHandler) GetAll(r *http.Request, params scim.ListRequestParams) (sc
 
 	resources := make([]scim.Resource, 0)
 
-	err := params.FilterValidator.Validate()
-	if err != nil {
-		return scim.Page{}, err
+	if params.FilterValidator != nil {
+		err := params.FilterValidator.Validate()
+		if err != nil {
+			return scim.Page{}, err
+		}
 	}
 
 	groups, err := ldapCtx.searchGroups("*", "cn")
@@ -168,10 +170,12 @@ func (h GroupHandler) GetAll(r *http.Request, params scim.ListRequestParams) (sc
 
 		if i >= params.StartIndex {
 			resource := ldapEntryToGroupResource(entry)
-			err = params.FilterValidator.PassesFilter(resource.Attributes)
-			if err != nil {
-				slog.Info("An error occurred while validating filter", "err", err)
-				continue
+			if params.FilterValidator != nil {
+				err = params.FilterValidator.PassesFilter(resource.Attributes)
+				if err != nil {
+					slog.Info("An error occurred while validating filter", "err", err)
+					continue
+				}
 			}
 			resources = append(resources, resource)
 		}
@@ -182,6 +186,21 @@ func (h GroupHandler) GetAll(r *http.Request, params scim.ListRequestParams) (sc
 		TotalResults: i,
 		Resources:    resources,
 	}, nil
+}
+
+func (h GroupHandler) scimToLdapAttributes(attributes map[string][]string) map[string][]string {
+	result := make(map[string][]string)
+	for attribute, value := range attributes {
+		name := attribute
+		switch attribute {
+		case "displayName":
+			name = "o"
+			break
+		}
+
+		result[name] = value
+	}
+	return result
 }
 
 func (h GroupHandler) Patch(r *http.Request, id string, operations []scim.PatchOperation) (scim.Resource, error) {
@@ -196,41 +215,42 @@ func (h GroupHandler) Patch(r *http.Request, id string, operations []scim.PatchO
 		}
 	}
 
-	entries, err := ldapCtx.searchGroups(id, "cn")
+	entry, err := ldapCtx.GetGroup(id)
 
 	if err != nil {
 		slog.Error("An error occurred while getting group", "id", id, "err", err)
 		return scim.Resource{}, errors.ScimErrorInternal
 	}
 
-	for entry, err := range entries {
-		if err != nil {
-			slog.Error("An error occurred while getting group", "id", id, "err", err)
-			return scim.Resource{}, errors.ScimErrorInternal
-		}
-
-		adds, removes, replaces := classifyPatchOperations(operations)
-		h.transformMemberUUIDtoUID(ldapCtx, adds, "members", "memberUid")
-		h.transformMemberUUIDtoUID(ldapCtx, removes, "members", "memberUid")
-
-		err := ldapCtx.UpdateEntry(entry.DN, adds, removes, replaces)
-
-		if err != nil {
-			slog.Error("An error occurred while getting group", "id", id, "err", err)
-			return scim.Resource{}, errors.ScimErrorInternal
-		}
-
-		updatedEntry, err := ldapCtx.getByDN(entry.DN)
-
-		if err != nil {
-			slog.Error("An error occurred while getting group", "id", id, "err", err)
-			return scim.Resource{}, errors.ScimErrorInternal
-		}
-
-		return ldapEntryToGroupResource(updatedEntry), nil
+	if entry == nil {
+		return scim.Resource{}, errors.ScimErrorResourceNotFound(id)
 	}
 
-	return scim.Resource{}, errors.ScimErrorResourceNotFound(id)
+	adds, removes, replaces := classifyPatchOperations(operations)
+
+	adds = h.scimToLdapAttributes(adds)
+	removes = h.scimToLdapAttributes(removes)
+	replaces = h.scimToLdapAttributes(replaces)
+
+	h.transformMemberUUIDtoUID(ldapCtx, adds, "members", "memberUid")
+	h.transformMemberUUIDtoUID(ldapCtx, removes, "members", "memberUid")
+
+	err = ldapCtx.UpdateEntry(entry.DN, adds, removes, replaces)
+
+	if err != nil {
+		slog.Error("An error occurred while updating group", "id", id, "err", err)
+		return scim.Resource{}, errors.ScimErrorInternal
+	}
+
+	// Read the updated group
+	updatedEntry, err := ldapCtx.GetGroup(id)
+
+	if err != nil {
+		slog.Error("An error occurred while getting group", "id", id, "err", err)
+		return scim.Resource{}, errors.ScimErrorInternal
+	}
+
+	return ldapEntryToGroupResource(updatedEntry), nil
 }
 
 func (h GroupHandler) Replace(r *http.Request, id string, attributes scim.ResourceAttributes) (scim.Resource, error) {
@@ -276,6 +296,22 @@ func classifyPatchOperations(operations []scim.PatchOperation) (map[string][]str
 					continue
 				}
 			}
+		} else if reflect.ValueOf(op.Value).Kind() == reflect.Map {
+			for k, v := range op.Value.(map[string]interface{}) {
+				switch op.Op {
+				case scim.PatchOperationAdd:
+					adds[op.Path.String()] = append(adds[op.Path.String()], fmt.Sprintf("%s", v))
+				case scim.PatchOperationRemove:
+					removes[op.Path.String()] = append(removes[op.Path.String()], fmt.Sprintf("%s", v))
+				case scim.PatchOperationReplace:
+					replaces[k] = append(replaces[k], fmt.Sprintf("%s", v))
+
+				default:
+					slog.Info("unknown OP", "operation", op.Op, "path", op.Path, "value", op.Value)
+					continue
+				}
+			}
+
 		} else {
 			switch op.Op {
 			case scim.PatchOperationAdd:
@@ -283,9 +319,7 @@ func classifyPatchOperations(operations []scim.PatchOperation) (map[string][]str
 			case scim.PatchOperationRemove:
 				removes[op.Path.String()] = append(removes[op.Path.String()], fmt.Sprintf("%s", op.Value))
 			case scim.PatchOperationReplace:
-				for k, v := range op.Value.(map[string]interface{}) {
-					replaces[k] = append(replaces[k], fmt.Sprintf("%s", v))
-				}
+				replaces[op.Path.String()] = append(replaces[op.Path.String()], fmt.Sprintf("%s", op.Value))
 			default:
 				slog.Info("unknown OP", "operation", op.Op, "path", op.Path, "value", op.Value)
 				continue

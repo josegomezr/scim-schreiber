@@ -87,32 +87,45 @@ var GroupSchema = schema.Schema{
 			MultiValued: true,
 		})),
 		schema.SimpleCoreAttribute(schema.SimpleStringParams(schema.StringParams{
-			Name:     "externalId",
-			Required: true,
+			Name:       "externalId",
+			Required:   true,
+			Mutability: schema.AttributeMutabilityReadOnly(), // Write is currently not implemented for this
 		})),
 		schema.SimpleCoreAttribute(schema.SimpleStringParams(schema.StringParams{
 			Name:     "displayName",
 			Required: true,
 		})),
 		schema.ComplexCoreAttribute(schema.ComplexParams{
-			Name:        "ldapDistinguishedName",
-			Required:    true,
+			Name:        "members",
+			Required:    false,
 			MultiValued: true,
 			SubAttributes: []schema.SimpleParams{
 				schema.SimpleStringParams(schema.StringParams{
-					Name:     "familyName",
-					Required: true,
-				}),
-				schema.SimpleStringParams(schema.StringParams{
-					Name:     "formatted",
-					Required: true,
-				}),
-				schema.SimpleStringParams(schema.StringParams{
-					Name:     "givenName",
+					Name:     "value",
 					Required: true,
 				}),
 			},
 		}),
+		/*
+			schema.ComplexCoreAttribute(schema.ComplexParams{
+				Name:        "ldapDistinguishedName",
+				Required:    true,
+				MultiValued: false,
+				SubAttributes: []schema.SimpleParams{
+					schema.SimpleStringParams(schema.StringParams{
+						Name:     "familyName",
+						Required: true,
+					}),
+					schema.SimpleStringParams(schema.StringParams{
+						Name:     "formatted",
+						Required: true,
+					}),
+					schema.SimpleStringParams(schema.StringParams{
+						Name:     "givenName",
+						Required: true,
+					}),
+				},
+			}),*/
 	},
 }
 

@@ -6,6 +6,7 @@ import (
 	"log"
 	"log/slog"
 	"os"
+	"strconv"
 
 	"github.com/go-ldap/ldap/v3"
 )
@@ -44,6 +45,28 @@ func (l *LdapUtil) connect() error {
 
 	l.conn = conn
 	return nil
+}
+
+func (l *LdapUtil) CreateGroup(id string, name string, gid int) (string, error) {
+	dn := fmt.Sprintf("cn=%s,%s,%s", id, l.baseGroupOu, l.baseDn)
+	addReq := ldap.NewAddRequest(dn, []ldap.Control{})
+	addReq.Attribute("objectClass", []string{"top", "organization", "posixGroup"})
+	addReq.Attribute("o", []string{name})
+	addReq.Attribute("gidNumber", []string{strconv.Itoa(gid)})
+
+	if err := l.conn.Add(addReq); err != nil {
+		log.Fatal("error adding group:", addReq, err)
+		return "", err
+	}
+
+	return dn, nil
+}
+
+func (l *LdapUtil) DeleteGroup(id string) error {
+	dn := fmt.Sprintf("cn=%s,%s,%s", id, l.baseGroupOu, l.baseDn)
+	err := l.conn.Del(ldap.NewDelRequest(dn, []ldap.Control{}))
+
+	return err
 }
 
 func (l *LdapUtil) CreateUser(username string, password string, uuid string) (string, error) {
@@ -85,16 +108,20 @@ func (l *LdapUtil) disconnect() error {
 	return err
 }
 
-func (l *LdapUtil) getByDN(dn string) (*ldap.Entry, error) {
+func (l *LdapUtil) GetGroup(id string) (*ldap.Entry, error) {
+
+	filter := fmt.Sprintf("(cn=%s)", id)
+	baseUid := l.baseGroupOu + "," + l.baseDn
+
 	searchRequest := ldap.NewSearchRequest(
-		dn,
-		ldap.ScopeBaseObject,
+		baseUid,
+		ldap.ScopeWholeSubtree,
 		ldap.NeverDerefAliases,
 		1,
 		0,
 		false,
-		"",  // The filter to apply
-		nil, // A list attributes to retrieve
+		filter, // The filter to apply
+		nil,    // A list attributes to retrieve
 		nil,
 	)
 
@@ -105,7 +132,7 @@ func (l *LdapUtil) getByDN(dn string) (*ldap.Entry, error) {
 	}
 
 	if len(searchResult.Entries) != 1 {
-		return nil, fmt.Errorf("search returned %d results, expected 1", len(searchResult.Entries))
+		return nil, nil
 	}
 
 	return searchResult.Entries[0], nil

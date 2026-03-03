@@ -117,7 +117,7 @@ func (suite *SCIMUserTestSuite) TestCreateUser() {
 func (suite *SCIMUserTestSuite) TestReplaceUser() {
 	t := suite.T()
 
-	file, err := os.Open(filepath.Join(".", "testdata", "replace.json"))
+	file, err := os.Open(filepath.Join(".", "testdata", "replace_user.json"))
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		require.NoError(t, file.Close())
