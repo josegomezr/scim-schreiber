@@ -4,7 +4,6 @@ import (
 	"log"
 	"log/slog"
 	"net/http"
-	"os"
 
 	"github.com/elimity-com/scim"
 	"github.com/elimity-com/scim/optional"
@@ -55,15 +54,7 @@ func startHttpServer(server scim.Server, err error) {
 }
 
 func testConnection() {
-	l := LdapUtil{
-		conn:         nil,
-		ldapEndpoint: os.Getenv("LDAP_URL"),
-		ldapBindDn:   os.Getenv("LDAP_BIND_DN"),
-		ldapBindPw:   os.Getenv("LDAP_BIND_PW"),
-		baseUserOu:   os.Getenv("LDAP_BASE_USER_OU"),
-		baseDn:       os.Getenv("LDAP_BASE_DN"),
-		baseGroupOu:  os.Getenv("LDAP_BASE_GROUP_OU"),
-	}
+	l := LdapUtilFromEnv()
 
 	err := l.connect()
 	if err != nil {

@@ -5,6 +5,7 @@ import (
 	"iter"
 	"log"
 	"log/slog"
+	"os"
 
 	"github.com/go-ldap/ldap/v3"
 )
@@ -18,6 +19,18 @@ type LdapUtil struct {
 	baseGroupOu  string
 	baseDn       string
 	dialOpts     []ldap.DialOpt
+}
+
+func LdapUtilFromEnv() LdapUtil {
+	return LdapUtil{
+		conn:         nil,
+		ldapEndpoint: os.Getenv("LDAP_URL"),
+		ldapBindDn:   os.Getenv("LDAP_BIND_DN"),
+		ldapBindPw:   os.Getenv("LDAP_BIND_PW"),
+		baseUserOu:   os.Getenv("LDAP_BASE_USER_OU"),
+		baseDn:       os.Getenv("LDAP_BASE_DN"),
+		baseGroupOu:  os.Getenv("LDAP_BASE_GROUP_OU"),
+	}
 }
 
 func (l *LdapUtil) connect() error {
