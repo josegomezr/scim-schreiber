@@ -54,12 +54,12 @@ func (suite *SCIMUserTestSuite) SetupSuite() {
 	suite.server = server
 
 	ldapUtil := LdapUtil{
-		ldapEndpoint: endpoint,
-		ldapBindDn:   "cn=Directory Manager",
-		ldapBindPw:   "changeme",
-		baseUserOu:   "ou=people",
-		baseGroupOu:  "ou=groups",
-		baseDn:       ldapContainer.BaseDN,
+		endpoint:    endpoint,
+		bindDn:      "cn=Directory Manager",
+		bindPw:      "changeme",
+		baseUserOu:  "ou=people",
+		baseGroupOu: "ou=groups",
+		baseDn:      ldapContainer.BaseDN,
 		dialOpts: []ldap.DialOpt{
 			ldap.DialWithTLSConfig(&tls.Config{
 				InsecureSkipVerify: true,

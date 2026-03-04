@@ -12,34 +12,34 @@ import (
 )
 
 type LdapUtil struct {
-	conn         *ldap.Conn
-	ldapEndpoint string
-	ldapBindDn   string
-	ldapBindPw   string
-	baseUserOu   string
-	baseGroupOu  string
-	baseDn       string
-	dialOpts     []ldap.DialOpt
+	conn        *ldap.Conn
+	endpoint    string
+	bindDn      string
+	bindPw      string
+	baseUserOu  string
+	baseGroupOu string
+	baseDn      string
+	dialOpts    []ldap.DialOpt
 }
 
 func LdapUtilFromEnv() LdapUtil {
 	return LdapUtil{
-		conn:         nil,
-		ldapEndpoint: os.Getenv("LDAP_URL"),
-		ldapBindDn:   os.Getenv("LDAP_BIND_DN"),
-		ldapBindPw:   os.Getenv("LDAP_BIND_PW"),
-		baseUserOu:   os.Getenv("LDAP_BASE_USER_OU"),
-		baseDn:       os.Getenv("LDAP_BASE_DN"),
-		baseGroupOu:  os.Getenv("LDAP_BASE_GROUP_OU"),
+		conn:        nil,
+		endpoint:    os.Getenv("LDAP_URL"),
+		bindDn:      os.Getenv("LDAP_BIND_DN"),
+		bindPw:      os.Getenv("LDAP_BIND_PW"),
+		baseUserOu:  os.Getenv("LDAP_BASE_USER_OU"),
+		baseDn:      os.Getenv("LDAP_BASE_DN"),
+		baseGroupOu: os.Getenv("LDAP_BASE_GROUP_OU"),
 	}
 }
 
 func (l *LdapUtil) connect() error {
-	conn, err := ldap.DialURL(l.ldapEndpoint, l.dialOpts...)
+	conn, err := ldap.DialURL(l.endpoint, l.dialOpts...)
 	if err != nil {
 		return err
 	}
-	if err := conn.Bind(l.ldapBindDn, l.ldapBindPw); err != nil {
+	if err := conn.Bind(l.bindDn, l.bindPw); err != nil {
 		return err
 	}
 
