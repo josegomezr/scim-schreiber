@@ -25,7 +25,7 @@ func LdapMiddleware(next http.Handler) http.Handler {
 
 		err := l.connect()
 		if err != nil {
-			w.WriteHeader(500)
+			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 		defer l.disconnect()
