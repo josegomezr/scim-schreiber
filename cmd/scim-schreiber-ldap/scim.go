@@ -9,5 +9,5 @@ type ScimLogger struct {
 }
 
 func (c *ScimLogger) Error(args ...any) {
-	slog.Info(fmt.Sprintln(args...))
+	slog.Error(fmt.Sprintln(args...))
 }
