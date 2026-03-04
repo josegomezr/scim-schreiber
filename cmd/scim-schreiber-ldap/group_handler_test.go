@@ -136,7 +136,7 @@ func (suite *SCIMGroupTestSuite) TestDeleteGroup() {
 func (suite *SCIMGroupTestSuite) TestReplaceGroup() {
 	t := suite.T()
 
-	file, err := os.Open(filepath.Join(".", "testdata", "replace_group.json"))
+	file, err := os.Open(filepath.Join(".", "testdata", "replace-group.json"))
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		require.NoError(t, file.Close())
