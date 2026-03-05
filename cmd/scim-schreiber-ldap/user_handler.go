@@ -26,7 +26,15 @@ func (h UserHandler) Create(r *http.Request, attributes scim.ResourceAttributes)
 		}
 	}
 
-	if ldapCtx.searchUser(attributes["userName"].(string)) != nil {
+	username, ok := attributes["userName"].(string)
+	if !ok {
+		// Shouldn't really get here because then the schema validation failed before.
+		return scim.Resource{}, errors.ScimError{
+			Status: http.StatusBadRequest,
+		}
+	}
+
+	if ldapCtx.searchUser(username) != nil {
 		return scim.Resource{}, errors.ScimErrorUniqueness
 	}
 
