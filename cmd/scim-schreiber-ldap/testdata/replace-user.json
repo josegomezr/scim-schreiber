@@ -6,7 +6,18 @@
   },
   "displayName": "User Replace",
   "active": true,
-  "email": "replace@suse.com",
+  "emails": [
+    {
+      "primary": false,
+      "type": "work",
+      "value": "secondary@suse.com"
+    },
+    {
+      "primary": true,
+      "type": "work",
+      "value": "primary@suse.com"
+    }
+  ],
   "schemas": [
     "urn:ietf:params:scim:schemas:core:2.0:User"
   ],

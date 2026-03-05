@@ -33,10 +33,25 @@ var UserSchema = schema.Schema{
 			Name:     "active",
 			Required: true,
 		})),
-		schema.SimpleCoreAttribute(schema.SimpleStringParams(schema.StringParams{
-			Name:     "email",
-			Required: true,
-		})),
+		schema.ComplexCoreAttribute(schema.ComplexParams{
+			Name:        "emails",
+			Required:    true,
+			MultiValued: true,
+			SubAttributes: []schema.SimpleParams{
+				schema.SimpleBooleanParams(schema.BooleanParams{
+					Name:     "primary",
+					Required: true,
+				}),
+				schema.SimpleStringParams(schema.StringParams{
+					Name:     "type",
+					Required: true,
+				}),
+				schema.SimpleStringParams(schema.StringParams{
+					Name:     "value",
+					Required: true,
+				}),
+			},
+		}),
 		schema.SimpleCoreAttribute(schema.SimpleStringParams(schema.StringParams{
 			Name:       "externalId",
 			Required:   false,

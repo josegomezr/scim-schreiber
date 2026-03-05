@@ -9,7 +9,13 @@
   "displayName": "change: José Gómez",
   "id": "22084278-669c-58b1-910c-a0af5bce241a",
   "active": true,
-  "email": "jose.gomez@suse.com",
+  "emails": [
+    {
+      "primary": true,
+      "type": "work",
+      "value": "jose.gomez@suse.com"
+    }
+  ],
   "schemas": [
     "urn:ietf:params:scim:schemas:core:2.0:User"
   ],

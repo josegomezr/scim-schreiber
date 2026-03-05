@@ -141,6 +141,10 @@ func (suite *SCIMUserTestSuite) TestReplaceUser() {
             "resourceType": "User",
             "location": "Users/2a19013f-6a7e-4293-8782-6275d43ca030"
           },
+          "emails": [
+            { "type": "work", "primary": true, "value": "primary@suse.com" },
+            { "type": "work", "primary": false, "value": "secondary@suse.com" }
+          ],
           "schemas": [
             "urn:ietf:params:model:schemas:core:2.0:User"
           ],
@@ -228,6 +232,7 @@ func (suite *SCIMUserTestSuite) TestGetUser() {
        "id":"%[1]s",
        "userName":"test",
        "displayName": "Max Mustermann",
+       "emails": [],
        "meta": {
           "location": "Users/%[1]s",
           "resourceType":"User"
@@ -257,6 +262,7 @@ func (suite *SCIMUserTestSuite) TestGetAllUsers() {
     "externalId" : "uid=demo_user,ou=people,dc=suse,dc=com",
     "id" : "",
     "userName":"demo_user",
+    "emails": [],
     "meta" : {
       "resourceType" : "User",
       "location" : "Users/"
@@ -267,6 +273,7 @@ func (suite *SCIMUserTestSuite) TestGetAllUsers() {
     "id" : "2a19013f-6a7e-4293-8782-6275d43ca030",
     "userName":"test",
     "displayName": "Max Mustermann",
+    "emails": [],
     "meta" : {
       "resourceType" : "User",
       "location" : "Users/2a19013f-6a7e-4293-8782-6275d43ca030"
@@ -327,6 +334,7 @@ func (suite *SCIMUserTestSuite) TestFilterUsers() {
     "externalId" : "uid=test,ou=people,dc=suse,dc=com",
     "id" : "2a19013f-6a7e-4293-8782-6275d43ca030",
     "userName":"test",
+    "emails": [],
     "meta" : {
       "resourceType" : "User",
       "location" : "Users/2a19013f-6a7e-4293-8782-6275d43ca030"

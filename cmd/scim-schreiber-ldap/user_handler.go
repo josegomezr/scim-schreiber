@@ -3,6 +3,7 @@ package main
 import (
 	"log/slog"
 	"net/http"
+	"slices"
 
 	"github.com/elimity-com/scim"
 	"github.com/elimity-com/scim/errors"
@@ -185,9 +186,12 @@ func (h UserHandler) Replace(r *http.Request, id string, attributes scim.Resourc
 	// TODO(josegomezr): change more details
 	slog.Info("Updating user details.", "from", entry.GetAttributeValue("cn"), "to", attributes["displayName"])
 
+	s := scimMailToLdap(attributes)
+
 	replaces := map[string][]string{
 		"cn":           {attributes["displayName"].(string)},
 		"sshPublicKey": getOptionalAttribute(attributes, "sshPublicKey", []string{}),
+		"mail":         s,
 	}
 
 	err := ldapCtx.UpdateEntry(entry.DN, nil, nil, replaces)
@@ -203,6 +207,35 @@ func (h UserHandler) Replace(r *http.Request, id string, attributes scim.Resourc
 	return ldapEntryToUserResource(entry), nil
 }
 
+func scimMailToLdap(attributes scim.ResourceAttributes) []string {
+	mails, ok := attributes["emails"].([]interface{})
+
+	if !ok {
+		return []string{}
+	}
+
+	result := make([]string, 0, len(mails))
+
+	primary := ""
+
+	for _, entry := range mails {
+		mail := entry.(map[string]interface{})
+
+		if mail["primary"].(bool) {
+			primary = mail["value"].(string)
+			continue
+		}
+
+		result = append(result, mail["value"].(string))
+	}
+
+	if primary != "" {
+		result = slices.Insert(result, 0, primary)
+	}
+
+	return result
+}
+
 func getOptionalAttribute[T any](attributes scim.ResourceAttributes, name string, fallback T) T {
 	value, ok := attributes[name]
 
@@ -213,13 +246,28 @@ func getOptionalAttribute[T any](attributes scim.ResourceAttributes, name string
 	return value.(T)
 }
 
+func ldapMailToSCIMMail(entry *ldap.Entry) []interface{} {
+	ldapMails := entry.GetAttributeValues("mail")
+	result := make([]interface{}, 0, len(ldapMails))
+	for i, mail := range ldapMails {
+		result = append(result, map[string]interface{}{
+			"value":   mail,
+			"type":    "work",
+			"primary": i == 0,
+		})
+	}
+	return result
+}
+
 func ldapEntryToUserResource(entry *ldap.Entry) scim.Resource {
+
 	return scim.Resource{
 		ID:         entry.GetAttributeValue("uuid"),
 		ExternalID: optional.NewString(entry.DN),
 		Attributes: map[string]interface{}{
 			"userName":    entry.GetAttributeValue("uid"),
 			"displayName": entry.GetAttributeValue("cn"),
+			"emails":      ldapMailToSCIMMail(entry),
 		},
 	}
 }
