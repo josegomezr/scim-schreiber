@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
 	"slices"
@@ -9,6 +10,7 @@ import (
 	"github.com/elimity-com/scim/errors"
 	"github.com/elimity-com/scim/optional"
 	"github.com/go-ldap/ldap/v3"
+	scim_filter_parser "github.com/scim2/filter-parser/v2"
 )
 
 type UserHandler struct {
@@ -96,6 +98,23 @@ func (h UserHandler) Get(r *http.Request, id string) (scim.Resource, error) {
 	return ldapEntryToUserResource(entry), nil
 }
 
+func principalFromFilter(dafilter scim_filter_parser.Expression) (string, error) {
+	if dafilter == nil {
+		return "", nil
+	}
+	f, ok := dafilter.(*scim_filter_parser.AttributeExpression)
+	if !ok {
+		return "", fmt.Errorf("only single expressions are supported")
+	}
+	if f.Operator != "eq" {
+		return "", fmt.Errorf("only operator 'eq' is supported in filters")
+	}
+	if f.AttributePath.AttributeName != "userName" {
+		return "", fmt.Errorf("only 'userName' is supported in filters")
+	}
+	return f.CompareValue.(string), nil
+}
+
 func (h UserHandler) GetAll(r *http.Request, params scim.ListRequestParams) (scim.Page, error) {
 	ldapCtx, ok := GetLDAPContext(r.Context())
 
@@ -120,21 +139,24 @@ func (h UserHandler) GetAll(r *http.Request, params scim.ListRequestParams) (sci
 
 	resources := make([]scim.Resource, 0)
 
+	uid := "*"
 	if params.FilterValidator != nil {
-		err := params.FilterValidator.Validate()
+		filterVal, err := principalFromFilter(params.FilterValidator.GetFilter())
 		if err != nil {
 			return scim.Page{}, err
 		}
+		if filterVal != "" {
+			uid = filterVal
+		}
 	}
 
-	users, err := ldapCtx.searchUsers("*", "uid")
+	users, err := ldapCtx.searchUsers(uid, "uid")
 
 	if err != nil {
 		return scim.Page{}, errors.ScimErrorInternal
 	}
 
 	i := 1
-
 	for entry := range users {
 		// Ldap pagination does not support start index. So skip until we find the correct entry
 		if i > (params.StartIndex + params.Count - 1) {
@@ -143,15 +165,7 @@ func (h UserHandler) GetAll(r *http.Request, params scim.ListRequestParams) (sci
 		}
 
 		if i >= params.StartIndex {
-			resource := ldapEntryToUserResource(entry)
-			if params.FilterValidator != nil {
-				err = params.FilterValidator.PassesFilter(resource.Attributes)
-				if err != nil {
-					slog.Info("An error occurred while validating filter", "err", err)
-					continue
-				}
-			}
-			resources = append(resources, resource)
+			resources = append(resources, ldapEntryToUserResource(entry))
 		}
 		i++
 	}
