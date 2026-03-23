@@ -36,7 +36,7 @@ type Client struct {
 
 type ConfiguratorFn func(*Config)
 
-const FIELDS = "id,givenName,surname,displayName,mailNickname,userPrincipalName,accountEnabled,onPremisesImmutableId"
+const msGraphFields = "id,givenName,surname,displayName,mailNickname,userPrincipalName,accountEnabled,onPremisesImmutableId"
 
 func NewClient(fns ...ConfiguratorFn) (*Client, error) {
 	cfg := &Config{}
@@ -64,13 +64,13 @@ func NewClient(fns ...ConfiguratorFn) (*Client, error) {
 }
 
 func (c *Client) GetUser(uuid string) (*User, error) {
-	newu := c.config.baseURL.JoinPath(fmt.Sprintf("/users/%s", uuid))
+	newu := c.config.baseURL.JoinPath("/users/", uuid)
 	v := newu.Query()
-	v.Set("$select", "id,givenName,surname,displayName,mailNickname,userPrincipalName,accountEnabled,onPremisesImmutableId")
+	v.Set("$select", msGraphFields)
 	newu.RawQuery = v.Encode()
 
 	userResp := User{}
-	resp, err := c.newRequest("GET", newu.String(), nil, nil)
+	resp, err := c.newRequestRoundTrip("GET", newu.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -90,9 +90,9 @@ func (c *Client) ListAllUsers(principal string) iter.Seq2[*User, error] {
 	return func(yield func(*User, error) bool) {
 		newu := c.config.baseURL.JoinPath("/users/")
 		v := newu.Query()
-		v.Set("$top", "20")
+		v.Set("$top", "100")
 		v.Set("$count", "true")
-		v.Set("$select", "id,givenName,surname,displayName,mailNickname,userPrincipalName,accountEnabled,onPremisesImmutableId")
+		v.Set("$select", msGraphFields)
 		if principal != "" {
 			// MSGraph uses single quote for filter, just amazing...
 			filterExpr := fmt.Sprintf(`userPrincipalName eq '%s@%s'`, principal, c.config.TenantDomain)
@@ -104,8 +104,7 @@ func (c *Client) ListAllUsers(principal string) iter.Seq2[*User, error] {
 		userResp := UserListResponse{}
 		uri := newu.String()
 		for {
-			// TODO(josegomezr): check status code of ms response
-			resp, err := c.newRequest("GET", uri, nil, nil)
+			resp, err := c.newRequestRoundTrip("GET", uri, nil)
 			if err != nil {
 				yield(nil, err)
 				return
@@ -132,17 +131,20 @@ func (c *Client) ListAllUsers(principal string) iter.Seq2[*User, error] {
 }
 
 func (c *Client) UpdateUser(uuid string, user User) (*User, error) {
-	newu := c.config.baseURL.JoinPath(fmt.Sprintf("/users/%s", uuid))
+	newu := c.config.baseURL.JoinPath("/users/", uuid)
 
 	buf := new(bytes.Buffer)
 	if err := json.NewEncoder(buf).Encode(user); err != nil {
 		return nil, err
 	}
 
-	headers := make(map[string]string)
-	headers["Content-type"] = "application/json"
+	req, err := c.newRequest("PATCH", newu.String(), buf)
+	if err != nil {
+		return nil, err
+	}
 
-	resp, err := c.newRequest("PATCH", newu.String(), headers, buf)
+	req.Header.Set("Content-type", "application/json")
+	resp, err := c.doRequest(req)
 	if err != nil {
 		return nil, err
 	}
@@ -166,10 +168,13 @@ func (c *Client) CreateUser(user User) (*User, error) {
 		return nil, err
 	}
 
-	headers := make(map[string]string)
-	headers["Content-type"] = "application/json"
+	req, err := c.newRequest("POST", newu.String(), buf)
+	if err != nil {
+		return nil, err
+	}
 
-	resp, err := c.newRequest("POST", newu.String(), headers, buf)
+	req.Header.Set("Content-type", "application/json")
+	resp, err := c.doRequest(req)
 	if err != nil {
 		return nil, err
 	}
@@ -187,8 +192,9 @@ func (c *Client) CreateUser(user User) (*User, error) {
 	newUser.Id = userResp.Id
 	return &newUser, nil
 }
+
 func (c *Client) DeleteUser(uuid string) error {
-	newu := c.config.baseURL.JoinPath(fmt.Sprintf("/users/%s", uuid))
+	newu := c.config.baseURL.JoinPath("/users/", uuid)
 
 	currentUser, err := c.GetUser(uuid)
 	if err != nil {
@@ -243,7 +249,7 @@ func (c *Client) DeleteUser(uuid string) error {
 		}
 	}
 
-	resp, err := c.newRequest("DELETE", newu.String(), nil, nil)
+	resp, err := c.newRequestRoundTrip("DELETE", newu.String(), nil)
 	if err != nil {
 		return err
 	}
@@ -281,11 +287,14 @@ func (c *Client) negotiateAccessToken() error {
 	return nil
 }
 
-func (c *Client) newRequest(method, uri string, headers map[string]string, body io.Reader) (*http.Response, error) {
-	if headers == nil {
-		headers = make(map[string]string)
+func (c *Client) newRequestRoundTrip(method, uri string, body io.Reader) (*http.Response, error) {
+	req, err := c.newRequest(method, uri, body)
+	if err != nil {
+		return nil, err
 	}
-
+	return c.doRequest(req)
+}
+func (c *Client) newRequest(method, uri string, body io.Reader) (*http.Request, error) {
 	{
 		c.mutex.Lock()
 		defer c.mutex.Unlock()
@@ -297,26 +306,27 @@ func (c *Client) newRequest(method, uri string, headers map[string]string, body 
 		}
 	}
 
-	headers["Authorization"] = "Bearer " + c.authToken
-	headers["ConsistencyLevel"] = "eventual"
+	req, err := c.newRawRequest(method, uri, body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.authToken)
+	req.Header.Set("ConsistencyLevel", "eventual")
 
-	return c.newRawRequest(method, uri, headers, body)
+	return req, nil
 }
 
-func (c *Client) newRawRequest(method, uri string, headers map[string]string, body io.Reader) (*http.Response, error) {
-	slog.Info("MS-Graph request", "method", method, "uri", uri)
+func (c *Client) newRawRequest(method, uri string, body io.Reader) (*http.Request, error) {
 	req, err := http.NewRequest(method, uri, body)
 	if err != nil {
 		return nil, err
 	}
+	return req, nil
+}
 
-	if headers != nil {
-		for k, v := range headers {
-			req.Header.Set(k, v)
-		}
-	}
+func (c *Client) doRequest(req *http.Request) (*http.Response, error) {
+	slog.Info("MS-Graph request", "method", req.Method, "url", req.URL.String())
 	resp, err := http.DefaultClient.Do(req)
 	slog.Debug("MS-Graph response", "status", resp.StatusCode)
-
 	return resp, err
 }

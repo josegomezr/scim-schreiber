@@ -37,7 +37,7 @@ func (h UserHandler) Delete(r *http.Request, id string) error {
 	slog.Info("DELETE /v2/Users", "id", id)
 	err := h.client.DeleteUser(id)
 	if err != nil {
-		return errors.ScimError{Status: http.StatusInternalServerError, Detail: fmt.Sprintf("%s", err)}
+		return errors.ScimError{Status: http.StatusInternalServerError, Detail: err.Error()}
 	}
 
 	return nil
