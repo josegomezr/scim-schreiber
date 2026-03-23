@@ -182,7 +182,9 @@ class DaApp:
 
 
 app = DaApp(os.environ["SFDC_BASE_URL"])
-httpd = make_server("", PORT, app)
-logger.info(f"Listening to *:{PORT}")
-logger.info("Will forward requests to: {}".format(os.environ["SFDC_BASE_URL"]))
-httpd.serve_forever()
+
+if __name__ == '__main__':
+    httpd = make_server("", PORT, app)
+    logger.info(f"Listening to *:{PORT}")
+    logger.info("Will forward requests to: {}".format(os.environ["SFDC_BASE_URL"]))
+    httpd.serve_forever()
