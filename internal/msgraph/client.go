@@ -194,47 +194,61 @@ func (c *Client) CreateUser(user User) (*User, error) {
 }
 
 func (c *Client) DeleteUser(uuid string) error {
-	newu := c.config.baseURL.JoinPath("/users/", uuid)
+	// Delete from recycle bin, yes, as you read it...
+	newu := c.config.baseURL.JoinPath("/directory/deletedItems/", uuid)
+	c.newRequestRoundTrip("DELETE", newu.String(), nil)
 
+	newu = c.config.baseURL.JoinPath("/users/", uuid)
 	currentUser, err := c.GetUser(uuid)
 	if err != nil {
 		return fmt.Errorf("Could not find User. Details=%s", err)
 	}
 
-	currentPrincipal := currentUser.UserPrincipalName
+	// If not found, early exit, not much we can do, the recycle bin was already
+	// triggered in the request above.
+	if currentUser == nil {
+		return nil
+	}
 
-	if !strings.HasPrefix("to-be-deleted-", currentPrincipal) {
+	// So, this is ugly, but simplicity wins. MS Graph API is eventually
+	// consistent, and will only allow changes to the OnPremisesImmutableId if
+	// and only if the UserPrincipalName is not "federated" (meaning is something
+	// else but a *.onmicrosoft.com domain)
+	//
+	// Without this dance deletions will land on the recycle bin (yes, that
+	// recycle bin).
+	//
+	// We'll mark the user as inative so it can't really use anything, and then
+	// change the principal name.
+	//
+	// Then we check 7 times with a 5 seconds wait in between if the principal
+	// name change was propagated. if until that it hasn't changed, then we'll
+	// roll it and go with the flow all the way to the actual deletion.
+	//
+	// The consequence of this is having users as "to-be-deleted" in the
+	// directory, they're easy enough to spot and cleanup.
+	//
+	// Retries will cleanup the recycle bin in case the principal name change
+	// failed.
+	if !strings.HasPrefix("to-be-deleted-", currentUser.UserPrincipalName) {
 		newPrincipalName := fmt.Sprintf("to-be-deleted-%s@%s", uuid, c.config.OnMicrosoftDomain)
 		userModel := User{
 			UserPrincipalName: newPrincipalName,
+			AccountEnabled:    false,
 		}
 
 		if _, err := c.UpdateUser(uuid, userModel); err != nil {
 			return fmt.Errorf("Could not change UserPrincipalName. Details=%s", err)
 		}
 
-		// So, this is ugly, but simplicity wins. MS Graph API is eventually
-		// consistent, and will only allow changes to the OnPremisesImmutableId if
-		// and only if the UserPrincipalName is not "federated" (meaning is something
-		// else but a *.onmicrosoft.com domain)
-		//
-		// Without this dance deletions can take many hours (if not days) to settle.
-		//
-		// We'll check 7 times with a 5 seconds wait in between if the principal
-		// name change was propagated., if until that it hasn't changed, then we'll
-		// roll it and go with the flow.
-		//
-		// The consequence of this is having users as "to-be-deleted" in the
-		// directory, they're easy enough to spot and cleanup.
-
 		times := 0
 		for times < 7 {
+			time.Sleep(5 * time.Second)
 			times += 1
 			newuser, err := c.GetUser(uuid)
-			if err != nil || currentPrincipal == newuser.UserPrincipalName {
+			if err != nil || newuser.UserPrincipalName == newPrincipalName {
 				break
 			}
-			time.Sleep(5 * time.Second)
 		}
 	}
 
@@ -242,11 +256,9 @@ func (c *Client) DeleteUser(uuid string) error {
 		newImmutableId := fmt.Sprintf("%s-%s", "to-be-deleted", uuid)
 		userModel := User{
 			OnPremisesImmutableId: newImmutableId,
+			AccountEnabled:        false,
 		}
-
-		if _, err := c.UpdateUser(uuid, userModel); err != nil {
-			return fmt.Errorf("Could not change OnPremisesImmutableId. Details=%s", err)
-		}
+		c.UpdateUser(uuid, userModel)
 	}
 
 	resp, err := c.newRequestRoundTrip("DELETE", newu.String(), nil)
