@@ -7,7 +7,7 @@ type User struct {
 	DisplayName           string `json:"displayName,omitempty"`
 	MailNickname          string `json:"mailNickname,omitempty"`
 	UserPrincipalName     string `json:"userPrincipalName,omitempty"`
-	AccountEnabled        bool   `json:"accountEnabled,omitempty"`
+	AccountEnabled        bool   `json:"accountEnabled"`
 	OnPremisesImmutableId string `json:"onPremisesImmutableId,omitempty"`
 }
 
