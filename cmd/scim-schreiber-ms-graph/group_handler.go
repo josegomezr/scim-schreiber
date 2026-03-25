@@ -3,9 +3,6 @@ package main
 import (
 	"fmt"
 	"log/slog"
-	// "io"
-	// "os"
-	// "encoding/json"
 	"net/http"
 
 	"github.com/elimity-com/scim"
@@ -28,7 +25,7 @@ func (h GroupHandler) Create(r *http.Request, attributes scim.ResourceAttributes
 	groupRequest := resourceToMsGroup(attributes)
 	group, err := h.client.CreateGroup(*groupRequest)
 	if err != nil {
-		return scim.Resource{}, errors.ScimError{Status: http.StatusInternalServerError, Detail: fmt.Sprintf("%s", err)}
+		return scim.Resource{}, errors.ScimError{Status: http.StatusInternalServerError, Detail: err.String()}
 	}
 
 	return msGroupToGroupResource(group), nil
@@ -118,9 +115,56 @@ func (h GroupHandler) GetAll(r *http.Request, params scim.ListRequestParams) (sc
 	}, nil
 }
 
+
 func (h GroupHandler) Patch(r *http.Request, id string, operations []scim.PatchOperation) (scim.Resource, error) {
+	slog.Info("Patch /v2/Groups", "id", id, "operations", operations)
+	for _, op := range operations {
+		switch op.Path {
+		case "members":
+			continue
+		default:
+			return scim.Resource{}, errors.ScimError{Status: http.StatusNotImplemented, Detail: "Only membership changes are allowed"}
+		}
+	}
+
+	for _, op := range operations {
+		switch op.Op {
+		case "add":
+			fallthrough
+		case "remove":
+			continue
+		default:
+			return scim.Resource{}, errors.ScimError{Status: http.StatusNotImplemented, Detail: "Only membership add/remove is allowed"}
+		}
+	}
+
+	var adds []string
+	var removes []string
+
+	// members are guaranteed to be multivalued
+	for _, op := range operations {
+		for _, singleVal := range casting.MultiValue[map[string]interface{}](op.Value) {
+			value := casting.SingleValue[string](singleVal["value"])
+
+				switch op.Op {
+				case scim.PatchOperationAdd:
+					adds = append(adds, value)
+				case scim.PatchOperationRemove:
+					removes = append(removes, value)
+				default:
+					slog.Info("unknown OP", "operation", op.Op, "path", op.Path, "value", singleVal)
+					continue
+				}
+		}
+	}
+
+	err := h.client.UpdateGroupMemberships(id, adds, removes)
+	if err != nil {
+		return scim.Resource{}, errors.ScimError{Status: http.StatusNotImplemented, Detail: "Patch is not implemented for groups"}
+	}
+
 	slog.Info("PATCH /v2/Groups", "id", id, "operations", operations)
-	return scim.Resource{}, errors.ScimError{Status: http.StatusNotImplemented, Detail: "Patch is not implemented for groups"}
+	return scim.Resource{}, errors.ScimError{Status: http.StatusInternalServerError, Detail: err.String()}
 }
 
 func (h GroupHandler) Replace(r *http.Request, id string, attributes scim.ResourceAttributes) (scim.Resource, error) {
@@ -129,7 +173,7 @@ func (h GroupHandler) Replace(r *http.Request, id string, attributes scim.Resour
 	groupRequest := resourceToMsGroup(attributes)
 	msGroup, err := h.client.UpdateGroup(id, *groupRequest)
 	if err != nil {
-		return scim.Resource{}, errors.ScimError{Status: http.StatusInternalServerError, Detail: fmt.Sprintf("%s", err)}
+		return scim.Resource{}, errors.ScimError{Status: http.StatusInternalServerError, Detail: err.String()}
 	}
 	return msGroupToGroupResource(msGroup), nil
 }
