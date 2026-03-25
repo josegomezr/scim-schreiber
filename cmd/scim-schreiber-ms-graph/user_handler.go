@@ -3,9 +3,6 @@ package main
 import (
 	"fmt"
 	"log/slog"
-	// "io"
-	// "os"
-	// "encoding/json"
 	"net/http"
 
 	"github.com/elimity-com/scim"

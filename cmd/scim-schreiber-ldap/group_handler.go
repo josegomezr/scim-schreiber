@@ -13,6 +13,7 @@ import (
 	scim_filter_parser "github.com/scim2/filter-parser/v2"
 
 	"github.com/josegomezr/scim-schreiber-ldap/internal/model"
+	"github.com/josegomezr/scim-schreiber-ldap/internal/casting"
 )
 
 type GroupHandler struct {
