@@ -12,6 +12,7 @@ import (
 	"github.com/elimity-com/scim/errors"
 	"github.com/elimity-com/scim/filter"
 	"github.com/elimity-com/scim/optional"
+	"github.com/josegomezr/scim-schreiber-ldap/internal/casting"
 	"github.com/josegomezr/scim-schreiber-ldap/internal/msgraph"
 	scim_filter_parser "github.com/scim2/filter-parser/v2"
 )
@@ -95,22 +96,17 @@ func msUserToUserResource(entry *msgraph.User) scim.Resource {
 	}
 }
 
-func CastSingleValue[T any](input interface{}) T {
-	output, _ := input.(T)
-	return output
-}
-
 func resourceToMsUser(resourceAttrs map[string]interface{}) *msgraph.User {
-	nameMap := CastSingleValue[map[string]interface{}](resourceAttrs["name"])
+	nameMap := casting.SingleValue[map[string]interface{}](resourceAttrs["name"])
 
 	return &msgraph.User{
-		GivenName:             CastSingleValue[string](nameMap["givenName"]),
-		Surname:               CastSingleValue[string](nameMap["familyName"]),
-		DisplayName:           CastSingleValue[string](resourceAttrs["displayName"]),
-		MailNickname:          CastSingleValue[string](resourceAttrs["userName"]),
-		UserPrincipalName:     CastSingleValue[string](resourceAttrs["userName"]),
-		AccountEnabled:        CastSingleValue[bool](resourceAttrs["active"]),
-		OnPremisesImmutableId: CastSingleValue[string](resourceAttrs["externalId"]),
+		GivenName:             casting.SingleValue[string](nameMap["givenName"]),
+		Surname:               casting.SingleValue[string](nameMap["familyName"]),
+		DisplayName:           casting.SingleValue[string](resourceAttrs["displayName"]),
+		MailNickname:          casting.SingleValue[string](resourceAttrs["userName"]),
+		UserPrincipalName:     casting.SingleValue[string](resourceAttrs["userName"]),
+		AccountEnabled:        casting.SingleValue[bool](resourceAttrs["active"]),
+		OnPremisesImmutableId: casting.SingleValue[string](resourceAttrs["externalId"]),
 	}
 }
 

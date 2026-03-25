@@ -104,6 +104,16 @@ func createSCIMServer(cfg Config) (scim.Server, error) {
 				client: msgraphClient,
 			},
 		},
+		{
+			ID:          optional.NewString("Group"),
+			Name:        "Group",
+			Endpoint:    "/Groups",
+			Description: optional.NewString("Groups"),
+			Schema:      model.GroupSchema,
+			Handler: GroupHandler{
+				cfg: &cfg,
+			},
+		},
 	}
 
 	serverArgs := &scim.ServerArgs{
