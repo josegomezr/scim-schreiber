@@ -15,6 +15,9 @@ type Group struct {
 	Id              string `json:"id,omitempty"`
 	DisplayName     string `json:"displayName,omitempty"`
 	CreatedDateTime string `json:"createdDateTime,omitempty"`
+	MailEnabled     bool   `json:"mailEnabled"`
+	MailNickname    string `json:"mailNickname"`
+	SecurityEnabled bool   `json:"securityEnabled"`
 }
 
 type UserListResponse struct {
@@ -32,4 +35,8 @@ type GroupListResponse struct {
 	Count    int     `json:"@odata.count"`
 	NextLink string  `json:"@odata.nextLink"`
 	Groups   []Group `json:"value"`
+}
+
+type BindRequest struct {
+	ODataID string `json:"@odata.id"`
 }

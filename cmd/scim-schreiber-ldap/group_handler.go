@@ -10,8 +10,8 @@ import (
 	"github.com/elimity-com/scim/errors"
 	"github.com/elimity-com/scim/optional"
 	"github.com/go-ldap/ldap/v3"
-	"github.com/josegomezr/scim-schreiber-ldap/internal/model"
 	"github.com/josegomezr/scim-schreiber-ldap/internal/casting"
+	"github.com/josegomezr/scim-schreiber-ldap/internal/model"
 )
 
 type GroupHandler struct {
