@@ -1,12 +1,15 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
+	"unicode"
 
 	"github.com/elimity-com/scim"
-	"github.com/elimity-com/scim/errors"
+	scimerrors "github.com/elimity-com/scim/errors"
 	"github.com/elimity-com/scim/filter"
 	"github.com/elimity-com/scim/optional"
 	"github.com/josegomezr/scim-schreiber-ldap/internal/casting"
@@ -25,7 +28,10 @@ func (h GroupHandler) Create(r *http.Request, attributes scim.ResourceAttributes
 	groupRequest := resourceToMsGroup(attributes)
 	group, err := h.client.CreateGroup(*groupRequest)
 	if err != nil {
-		return scim.Resource{}, errors.ScimError{Status: http.StatusInternalServerError, Detail: err.String()}
+		if errors.Is(err, msgraph.GroupAlreadyExists) {
+			return scim.Resource{}, scimerrors.ScimError{Status: http.StatusConflict, Detail: err.Error()}
+		}
+		return scim.Resource{}, scimerrors.ScimError{Status: http.StatusInternalServerError, Detail: err.Error()}
 	}
 
 	return msGroupToGroupResource(group), nil
@@ -35,7 +41,7 @@ func (h GroupHandler) Delete(r *http.Request, id string) error {
 	slog.Info("DELETE /v2/Groups", "id", id)
 	err := h.client.DeleteGroup(id)
 	if err != nil {
-		return errors.ScimError{Status: http.StatusInternalServerError, Detail: err.Error()}
+		return scimerrors.ScimError{Status: http.StatusInternalServerError, Detail: err.Error()}
 	}
 
 	return nil
@@ -45,7 +51,7 @@ func (h GroupHandler) Get(r *http.Request, id string) (scim.Resource, error) {
 	slog.Info("GET /v2/Groups", "id", id)
 
 	if id == "" {
-		return scim.Resource{}, errors.ScimErrorResourceNotFound("")
+		return scim.Resource{}, scimerrors.ScimErrorResourceNotFound("")
 	}
 
 	msGroup, err := h.client.GetGroup(id)
@@ -54,7 +60,7 @@ func (h GroupHandler) Get(r *http.Request, id string) (scim.Resource, error) {
 	}
 
 	if msGroup == nil {
-		return scim.Resource{}, errors.ScimErrorResourceNotFound(id)
+		return scim.Resource{}, scimerrors.ScimErrorResourceNotFound(id)
 	}
 
 	return msGroupToGroupResource(msGroup), nil
@@ -89,20 +95,40 @@ func msGroupToGroupResource(entry *msgraph.Group) scim.Resource {
 }
 
 func resourceToMsGroup(resourceAttrs map[string]interface{}) *msgraph.Group {
+	displayName := casting.SingleValue[string](resourceAttrs["displayName"])
+	// derive the mailNickName out of the display name, we'll use it for
+	// uniqueness constraint as msoft doesn't offer that possibility for groups
+	// as it does for users.
+	mailNickName := strings.Map(func(r rune) rune {
+		if (r >= 32 && r >= 127) || strings.ContainsRune(`@()\[]";:<>,' `, r) {
+			return '-'
+		}
+		return unicode.ToLower(r)
+	}, displayName)
+
 	return &msgraph.Group{
-		DisplayName: casting.SingleValue[string](resourceAttrs["displayName"]),
+		DisplayName:     displayName,
+		MailEnabled:     false,
+		MailNickname:    mailNickName,
+		SecurityEnabled: true,
 	}
 }
 
 func (h GroupHandler) GetAll(r *http.Request, params scim.ListRequestParams) (scim.Page, error) {
 	slog.Info("GET /v2/Groups", "params", params)
+	filterExpr := ""
 	principal, err := displayNameFromFilter(params.FilterValidator)
 	if err != nil {
 		return scim.Page{}, err
 	}
 
+	if principal != "" {
+		// MSGraph uses single quote for filter, just amazing...
+		filterExpr = fmt.Sprintf(`displayName eq '%s'`, principal)
+	}
+
 	resources := make([]scim.Resource, 0)
-	for msGroup, err := range h.client.ListAllGroups(principal) {
+	for msGroup, err := range h.client.ListAllGroups(filterExpr) {
 		if err != nil {
 			return scim.Page{}, err
 		}
@@ -115,15 +141,15 @@ func (h GroupHandler) GetAll(r *http.Request, params scim.ListRequestParams) (sc
 	}, nil
 }
 
-
 func (h GroupHandler) Patch(r *http.Request, id string, operations []scim.PatchOperation) (scim.Resource, error) {
-	slog.Info("Patch /v2/Groups", "id", id, "operations", operations)
+	slog.Info("PATCH /v2/Groups", "id", id, "operations", operations)
+
 	for _, op := range operations {
-		switch op.Path {
+		switch op.Path.String() {
 		case "members":
 			continue
 		default:
-			return scim.Resource{}, errors.ScimError{Status: http.StatusNotImplemented, Detail: "Only membership changes are allowed"}
+			return scim.Resource{}, scimerrors.ScimError{Status: http.StatusNotImplemented, Detail: "Only membership changes are allowed"}
 		}
 	}
 
@@ -134,37 +160,38 @@ func (h GroupHandler) Patch(r *http.Request, id string, operations []scim.PatchO
 		case "remove":
 			continue
 		default:
-			return scim.Resource{}, errors.ScimError{Status: http.StatusNotImplemented, Detail: "Only membership add/remove is allowed"}
+			return scim.Resource{}, scimerrors.ScimError{Status: http.StatusNotImplemented, Detail: "Only membership add/remove is allowed"}
 		}
 	}
 
-	var adds []string
-	var removes []string
+	var pushErrors string
 
 	// members are guaranteed to be multivalued
 	for _, op := range operations {
 		for _, singleVal := range casting.MultiValue[map[string]interface{}](op.Value) {
 			value := casting.SingleValue[string](singleVal["value"])
-
-				switch op.Op {
-				case scim.PatchOperationAdd:
-					adds = append(adds, value)
-				case scim.PatchOperationRemove:
-					removes = append(removes, value)
-				default:
-					slog.Info("unknown OP", "operation", op.Op, "path", op.Path, "value", singleVal)
-					continue
+			switch op.Op {
+			case scim.PatchOperationAdd:
+				if err := h.client.AddUserToGroup(value, id); err != nil {
+					pushErrors += err.Error() + "\n"
+					slog.Warn("Error adding user from group", "user", value, "error", err)
 				}
+			case scim.PatchOperationRemove:
+				if err := h.client.RemoveUserFromGroup(value, id); err != nil {
+					pushErrors += err.Error() + "\n"
+					slog.Warn("Error removing user from group", "user", value, "error", err)
+				}
+			default:
+				slog.Info("unknown OP", "operation", op.Op, "path", op.Path, "value", singleVal)
+				continue
+			}
 		}
 	}
 
-	err := h.client.UpdateGroupMemberships(id, adds, removes)
-	if err != nil {
-		return scim.Resource{}, errors.ScimError{Status: http.StatusNotImplemented, Detail: "Patch is not implemented for groups"}
+	if len(pushErrors) > 0 {
+		return scim.Resource{}, scimerrors.ScimError{Status: http.StatusInternalServerError, Detail: pushErrors}
 	}
-
-	slog.Info("PATCH /v2/Groups", "id", id, "operations", operations)
-	return scim.Resource{}, errors.ScimError{Status: http.StatusInternalServerError, Detail: err.String()}
+	return scim.Resource{}, nil
 }
 
 func (h GroupHandler) Replace(r *http.Request, id string, attributes scim.ResourceAttributes) (scim.Resource, error) {
@@ -173,7 +200,7 @@ func (h GroupHandler) Replace(r *http.Request, id string, attributes scim.Resour
 	groupRequest := resourceToMsGroup(attributes)
 	msGroup, err := h.client.UpdateGroup(id, *groupRequest)
 	if err != nil {
-		return scim.Resource{}, errors.ScimError{Status: http.StatusInternalServerError, Detail: err.String()}
+		return scim.Resource{}, scimerrors.ScimError{Status: http.StatusInternalServerError, Detail: err.Error()}
 	}
 	return msGroupToGroupResource(msGroup), nil
 }

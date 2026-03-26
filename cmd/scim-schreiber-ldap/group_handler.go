@@ -14,6 +14,7 @@ import (
 
 	"github.com/josegomezr/scim-schreiber-ldap/internal/model"
 	"github.com/josegomezr/scim-schreiber-ldap/internal/casting"
+	"github.com/josegomezr/scim-schreiber-ldap/internal/model"
 )
 
 type GroupHandler struct {

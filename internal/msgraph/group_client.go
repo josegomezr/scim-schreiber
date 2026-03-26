@@ -3,22 +3,21 @@ package msgraph
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"iter"
 	"net/http"
 )
 
-func (c *Client) ListAllGroups(displayName string) iter.Seq2[*Group, error] {
+func (c *Client) ListAllGroups(filterExpr string) iter.Seq2[*Group, error] {
 	return func(yield func(*Group, error) bool) {
 		newu := c.config.baseURL.JoinPath("/groups/")
 		v := newu.Query()
 		v.Set("$top", "100")
 		v.Set("$count", "true")
 		v.Set("$select", msGraphGroupFields)
-		if displayName != "" {
-			// MSGraph uses single quote for filter, just amazing...
-			filterExpr := fmt.Sprintf(`displayName eq '%s'`, displayName)
+		if filterExpr != "" {
 			v.Set("$filter", filterExpr)
 		}
 
@@ -34,7 +33,9 @@ func (c *Client) ListAllGroups(displayName string) iter.Seq2[*Group, error] {
 			}
 
 			if resp.StatusCode != http.StatusOK {
-				yield(nil, fmt.Errorf("wrong status code: %d", resp.StatusCode))
+				buf := new(bytes.Buffer)
+				io.Copy(buf, resp.Body)
+				yield(nil, fmt.Errorf("wrong status code: %d. Details=%s", resp.StatusCode, buf.String()))
 				return
 			}
 
@@ -103,9 +104,67 @@ func (c *Client) UpdateGroup(uuid string, group Group) (*Group, error) {
 	return c.GetGroup(uuid)
 }
 
+func (c *Client) AddUserToGroup(userUuid string, groupUuid string) error {
+	newu := c.config.baseURL.JoinPath("/groups/", groupUuid, "/members/$ref")
+
+	payload := BindRequest{
+		ODataID: c.config.baseURL.JoinPath("/directoryObjects/", userUuid).String(),
+	}
+
+	buf := new(bytes.Buffer)
+	if err := json.NewEncoder(buf).Encode(payload); err != nil {
+		return err
+	}
+
+	req, err := c.newRequest("POST", newu.String(), buf)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-type", "application/json")
+
+	resp, err := c.doRequest(req)
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode != http.StatusNoContent {
+		buf := new(bytes.Buffer)
+		io.Copy(buf, resp.Body)
+		return fmt.Errorf("Error adding user=%s to group=%s. details=%s", userUuid, groupUuid, buf.String())
+	}
+
+	return nil
+}
+
+func (c *Client) RemoveUserFromGroup(userUuid string, groupUuid string) error {
+	newu := c.config.baseURL.JoinPath("/groups/", groupUuid, "/members/", userUuid, "$ref")
+
+	resp, err := c.newRequestRoundTrip("DELETE", newu.String(), nil)
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode != http.StatusNoContent {
+		buf := new(bytes.Buffer)
+		io.Copy(buf, resp.Body)
+		return fmt.Errorf("Error removing user=%s, from group=%s. details=%s", userUuid, groupUuid, buf.String())
+	}
+
+	return nil
+}
+
+var GroupAlreadyExists error = errors.New("Group with this slug already exists.")
+
 func (c *Client) CreateGroup(group Group) (*Group, error) {
 	newGroup := group // Shallow copy
 	newu := c.config.baseURL.JoinPath("/groups/")
+
+	for _, err := range c.ListAllGroups(fmt.Sprintf("mailNickname eq '%s'", group.MailNickname)) {
+		if err != nil {
+			return nil, err
+		}
+		return nil, GroupAlreadyExists
+	}
 
 	buf := new(bytes.Buffer)
 	if err := json.NewEncoder(buf).Encode(newGroup); err != nil {
@@ -134,6 +193,7 @@ func (c *Client) CreateGroup(group Group) (*Group, error) {
 		return nil, err
 	}
 	newGroup.Id = groupResp.Id
+	newGroup.CreatedDateTime = groupResp.CreatedDateTime
 	return &newGroup, nil
 }
 
