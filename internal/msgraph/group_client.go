@@ -135,6 +135,7 @@ func (c *Client) UpdateGroup(uuid string, group Group) (*Group, error) {
 	return c.GetGroup(uuid)
 }
 
+// TODO(josegomezr): skip adding if the requested user exists in the members
 func (c *Client) AddUserToGroup(userUuid string, groupUuid string) error {
 	newu := c.config.baseURL.JoinPath("/groups/", groupUuid, "/members/$ref")
 
@@ -167,6 +168,7 @@ func (c *Client) AddUserToGroup(userUuid string, groupUuid string) error {
 	return nil
 }
 
+// TODO(josegomezr): skip removing if the requested user exists in the members
 func (c *Client) RemoveUserFromGroup(userUuid string, groupUuid string) error {
 	newu := c.config.baseURL.JoinPath("/groups/", groupUuid, "/members/", userUuid, "$ref")
 

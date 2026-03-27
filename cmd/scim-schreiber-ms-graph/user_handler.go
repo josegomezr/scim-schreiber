@@ -1,12 +1,13 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 
 	"github.com/elimity-com/scim"
-	"github.com/elimity-com/scim/errors"
+	scimerrors "github.com/elimity-com/scim/errors"
 	"github.com/elimity-com/scim/filter"
 	"github.com/elimity-com/scim/optional"
 	"github.com/josegomezr/scim-schreiber-ldap/internal/casting"
@@ -25,7 +26,10 @@ func (h UserHandler) Create(r *http.Request, attributes scim.ResourceAttributes)
 	userRequest := resourceToMsUser(attributes)
 	user, err := h.client.CreateUser(*userRequest)
 	if err != nil {
-		return scim.Resource{}, errors.ScimError{Status: http.StatusInternalServerError, Detail: fmt.Sprintf("%s", err)}
+		if errors.Is(err, msgraph.UserAlreadyExists) {
+			return scim.Resource{}, scimerrors.ScimError{Status: http.StatusConflict, Detail: err.Error()}
+		}
+		return scim.Resource{}, scimerrors.ScimError{Status: http.StatusInternalServerError, Detail: fmt.Sprintf("%s", err)}
 	}
 
 	return msUserToUserResource(user), nil
@@ -35,7 +39,7 @@ func (h UserHandler) Delete(r *http.Request, id string) error {
 	slog.Info("DELETE /v2/Users", "id", id)
 	err := h.client.DeleteUser(id)
 	if err != nil {
-		return errors.ScimError{Status: http.StatusInternalServerError, Detail: err.Error()}
+		return scimerrors.ScimError{Status: http.StatusInternalServerError, Detail: err.Error()}
 	}
 
 	return nil
@@ -45,7 +49,7 @@ func (h UserHandler) Get(r *http.Request, id string) (scim.Resource, error) {
 	slog.Info("GET /v2/Users", "id", id)
 
 	if id == "" {
-		return scim.Resource{}, errors.ScimErrorResourceNotFound("")
+		return scim.Resource{}, scimerrors.ScimErrorResourceNotFound("")
 	}
 
 	msUser, err := h.client.GetUser(id)
@@ -54,7 +58,7 @@ func (h UserHandler) Get(r *http.Request, id string) (scim.Resource, error) {
 	}
 
 	if msUser == nil {
-		return scim.Resource{}, errors.ScimErrorResourceNotFound(id)
+		return scim.Resource{}, scimerrors.ScimErrorResourceNotFound(id)
 	}
 
 	return msUserToUserResource(msUser), nil
@@ -130,7 +134,7 @@ func (h UserHandler) GetAll(r *http.Request, params scim.ListRequestParams) (sci
 
 func (h UserHandler) Patch(r *http.Request, id string, operations []scim.PatchOperation) (scim.Resource, error) {
 	slog.Info("PATCH /v2/Users", "id", id, "operations", operations)
-	return scim.Resource{}, errors.ScimError{Status: http.StatusNotImplemented, Detail: "Patch is not implemented for users"}
+	return scim.Resource{}, scimerrors.ScimError{Status: http.StatusNotImplemented, Detail: "Patch is not implemented for users"}
 }
 
 func (h UserHandler) Replace(r *http.Request, id string, attributes scim.ResourceAttributes) (scim.Resource, error) {
@@ -139,7 +143,7 @@ func (h UserHandler) Replace(r *http.Request, id string, attributes scim.Resourc
 	userRequest := resourceToMsUser(attributes)
 	msUser, err := h.client.UpdateUser(id, *userRequest)
 	if err != nil {
-		return scim.Resource{}, errors.ScimError{Status: http.StatusInternalServerError, Detail: fmt.Sprintf("%s", err)}
+		return scim.Resource{}, scimerrors.ScimError{Status: http.StatusInternalServerError, Detail: fmt.Sprintf("%s", err)}
 	}
 	return msUserToUserResource(msUser), nil
 }

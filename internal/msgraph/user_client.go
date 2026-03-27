@@ -3,6 +3,7 @@ package msgraph
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"iter"
@@ -78,8 +79,10 @@ func (c *Client) ListAllUsers(principal string) iter.Seq2[*User, error] {
 	}
 }
 
-func (c *Client) UpdateUser(uuid string, user User) (*User, error) {
+func (c *Client) UpdateUser(uuid string, reqUser User) (*User, error) {
 	newu := c.config.baseURL.JoinPath("/users/", uuid)
+	user := reqUser
+	user.UserPrincipalName = fmt.Sprintf("%s@%s", user.UserPrincipalName, c.config.TenantDomain)
 
 	buf := new(bytes.Buffer)
 	if err := json.NewEncoder(buf).Encode(user); err != nil {
@@ -105,10 +108,18 @@ func (c *Client) UpdateUser(uuid string, user User) (*User, error) {
 	return c.GetUser(uuid)
 }
 
+var UserAlreadyExists error = errors.New("User with this user principal name already exists.")
+
 func (c *Client) CreateUser(user User) (*User, error) {
+	for _, err := range c.ListAllUsers(user.UserPrincipalName) {
+		if err != nil {
+			return nil, err
+		}
+		return nil, UserAlreadyExists
+	}
+
 	newUser := user // Shallow copy
 	newUser.UserPrincipalName = fmt.Sprintf("%s@%s", user.UserPrincipalName, c.config.TenantDomain)
-
 	newu := c.config.baseURL.JoinPath("/users/")
 
 	buf := new(bytes.Buffer)
@@ -179,7 +190,7 @@ func (c *Client) DeleteUser(uuid string) error {
 	// Retries will cleanup the recycle bin in case the principal name change
 	// failed.
 	if !strings.HasPrefix("to-be-deleted-", currentUser.UserPrincipalName) {
-		newPrincipalName := fmt.Sprintf("to-be-deleted-%s@%s", uuid, c.config.OnMicrosoftDomain)
+		newPrincipalName := fmt.Sprintf("to-be-deleted-%s", uuid)
 		userModel := User{
 			UserPrincipalName: newPrincipalName,
 			AccountEnabled:    false,
