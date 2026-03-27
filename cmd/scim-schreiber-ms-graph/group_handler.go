@@ -90,6 +90,7 @@ func msGroupToGroupResource(entry *msgraph.Group) scim.Resource {
 		Attributes: map[string]interface{}{
 			"displayName":     entry.DisplayName,
 			"createdDateTime": entry.CreatedDateTime,
+			"members":         entry.Members,
 		},
 	}
 }

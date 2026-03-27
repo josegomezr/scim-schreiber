@@ -34,6 +34,7 @@ type Client struct {
 type ConfiguratorFn func(*Config)
 
 const msGraphUserFields = "id,givenName,surname,displayName,mailNickname,userPrincipalName,accountEnabled,onPremisesImmutableId"
+const msGraphMembershipFields = "id,displayName,userPrincipalName"
 const msGraphGroupFields = "id,displayName,createdDateTime"
 
 func NewClient(fns ...ConfiguratorFn) (*Client, error) {
@@ -73,7 +74,7 @@ func (c *Client) newRequest(method, uri string, body io.Reader) (*http.Request, 
 		c.mutex.Lock()
 		defer c.mutex.Unlock()
 		if c.authToken == "" || time.Now().After(c.authExpires) {
-			err := c.negotiateAccessToken()
+			err := c.NegotiateAccessToken()
 			if err != nil {
 				return nil, err
 			}
@@ -105,7 +106,7 @@ func (c *Client) doRequest(req *http.Request) (*http.Response, error) {
 	return resp, err
 }
 
-func (c *Client) negotiateAccessToken() error {
+func (c *Client) NegotiateAccessToken() error {
 	h := url.Values{}
 	h.Set("client_id", c.config.ClientId)
 	h.Set("client_secret", c.config.ClientSecret)
@@ -118,7 +119,7 @@ func (c *Client) negotiateAccessToken() error {
 		return err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("Wrong auth response")
+		return fmt.Errorf("Could not authenticate with the given credentials.")
 	}
 	ar := AuthTokenResponse{}
 	if err := json.NewDecoder(resp.Body).Decode(&ar); err != nil {

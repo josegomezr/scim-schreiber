@@ -74,7 +74,38 @@ func (c *Client) GetGroup(uuid string) (*Group, error) {
 	if err := json.NewDecoder(resp.Body).Decode(&groupResp); err != nil {
 		return nil, err
 	}
+
+	memResp, err := c.GetGroupMembers(uuid)
+	if err != nil {
+		return nil, err
+	}
+
+	groupResp.Members = memResp.Members
+
 	return &groupResp, nil
+}
+
+func (c *Client) GetGroupMembers(uuid string) (*MemberListResponse, error) {
+	newu := c.config.baseURL.JoinPath("/groups/", uuid, "members")
+	v := newu.Query()
+	v.Set("$select", msGraphMembershipFields)
+	newu.RawQuery = v.Encode()
+
+	membersResp := MemberListResponse{}
+	resp, err := c.newRequestRoundTrip("GET", newu.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// dummy not found
+	if resp.StatusCode != http.StatusOK {
+		return nil, nil
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&membersResp); err != nil {
+		return nil, err
+	}
+	return &membersResp, nil
 }
 
 func (c *Client) UpdateGroup(uuid string, group Group) (*Group, error) {
