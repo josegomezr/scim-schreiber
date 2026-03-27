@@ -88,12 +88,15 @@ func createSCIMServer(cfg Config) (scim.Server, error) {
 	config := scim.ServiceProviderConfig{
 		AuthenticationSchemes: []scim.AuthenticationScheme{
 			{
-				Type: scim.AuthenticationTypeHTTPBasic,
-				Name: "HTTP Basic",
+				Type:             scim.AuthenticationTypeHTTPBasic,
+				Name:             "HTTP Basic",
+				DocumentationURI: optional.NewString("http://nobody.cares/"),
+				SpecURI:          optional.NewString("http://nobody.cares/"),
 			},
 		},
 		MaxResults:       100,
 		SupportFiltering: true,
+		DocumentationURI: optional.NewString("http://nobody.cares/"),
 	}
 
 	resourceTypes := []scim.ResourceType{

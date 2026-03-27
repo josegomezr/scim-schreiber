@@ -77,20 +77,28 @@ func displayNameFromFilter(filterValidator *filter.Validator) (string, error) {
 	if f.Operator != "eq" {
 		return "", fmt.Errorf("only operator 'eq' is supported in filters")
 	}
-	if f.AttributePath.AttributeName != "groupName" {
-		return "", fmt.Errorf("only 'groupName' is supported in filters")
+	if f.AttributePath.AttributeName != "displayName" {
+		return "", fmt.Errorf("only 'displayName' is supported in filters")
 	}
 	return f.CompareValue.(string), nil
 }
 
 func msGroupToGroupResource(entry *msgraph.Group) scim.Resource {
+	members := []map[string]string{}
+	for _, mem := range entry.Members {
+		memberMap := make(map[string]string)
+		memberMap["value"] = mem.Id
+		memberMap["display"] = fmt.Sprintf("%s (%s)", mem.DisplayName, mem.UserPrincipalName)
+		members = append(members, memberMap)
+	}
+
 	return scim.Resource{
 		ID:         entry.Id,
 		ExternalID: optional.NewString(entry.Id),
 		Attributes: map[string]interface{}{
 			"displayName":     entry.DisplayName,
 			"createdDateTime": entry.CreatedDateTime,
-			"members":         entry.Members,
+			"members":         members,
 		},
 	}
 }
