@@ -10,6 +10,7 @@ import (
 	"github.com/elimity-com/scim/errors"
 	"github.com/elimity-com/scim/optional"
 	"github.com/go-ldap/ldap/v3"
+	"github.com/josegomezr/scim-schreiber-ldap/internal/casting"
 	"github.com/josegomezr/scim-schreiber-ldap/internal/model"
 )
 
@@ -283,8 +284,8 @@ func classifyPatchOperations(operations []scim.PatchOperation) (map[string][]str
 
 	for _, op := range operations {
 		if reflect.ValueOf(op.Value).Kind() == reflect.Slice {
-			for _, singleVal := range CastMultiValue[map[string]interface{}](op.Value) {
-				value := CastSingleValue[string](singleVal["value"])
+			for _, singleVal := range casting.MultiValue[map[string]interface{}](op.Value) {
+				value := casting.SingleValue[string](singleVal["value"])
 
 				switch op.Op {
 				case scim.PatchOperationAdd:

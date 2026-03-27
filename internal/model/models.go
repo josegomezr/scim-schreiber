@@ -144,6 +144,53 @@ var GroupSchema = schema.Schema{
 	},
 }
 
+var SalesforceUserExtrasSchema = schema.Schema{
+	ID:          "urn:suse:schemas:extension:salesforce-user-extras:2.0",
+	Name:        optional.NewString("SalesforceUserExtras"),
+	Description: optional.NewString("Salesforce user extras"),
+	Attributes: []schema.CoreAttribute{
+		schema.ComplexCoreAttribute(schema.ComplexParams{
+			Name:        "userPermissions",
+			Required:    true,
+			MultiValued: false,
+			SubAttributes: []schema.SimpleParams{
+				schema.SimpleBooleanParams(schema.BooleanParams{
+					Name:     "MarketingUser",
+					Required: false,
+				}),
+				schema.SimpleBooleanParams(schema.BooleanParams{
+					Name:     "OfflineUser",
+					Required: false,
+				}),
+				schema.SimpleBooleanParams(schema.BooleanParams{
+					Name:     "AvantgoUser",
+					Required: false,
+				}),
+				schema.SimpleBooleanParams(schema.BooleanParams{
+					Name:     "CallCenterAutoLogin",
+					Required: false,
+				}),
+				schema.SimpleBooleanParams(schema.BooleanParams{
+					Name:     "SFContentUser",
+					Required: false,
+				}),
+				schema.SimpleBooleanParams(schema.BooleanParams{
+					Name:     "KnowledgeUser",
+					Required: false,
+				}),
+				schema.SimpleBooleanParams(schema.BooleanParams{
+					Name:     "InteractionUser",
+					Required: false,
+				}),
+				schema.SimpleBooleanParams(schema.BooleanParams{
+					Name:     "SupportUser",
+					Required: false,
+				}),
+			},
+		}),
+	},
+}
+
 type ValueObj struct {
 	Value string `json:"value"`
 }
