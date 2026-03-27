@@ -159,17 +159,13 @@ func (c *Client) DeleteUser(uuid string) error {
 
 	newu = c.config.baseURL.JoinPath("/users/", uuid)
 	currentUser, err := c.GetUser(uuid)
-	if err != nil {
-		return fmt.Errorf("Could not find User. Details=%s", err)
-	}
-
 	// If not found, early exit, not much we can do, the recycle bin was already
 	// triggered in the request above.
-	if currentUser == nil {
+	if err != nil || currentUser == nil {
 		return nil
 	}
 
-	// So, this is ugly, but simplicity wins. MS Graph API is eventually
+	// So, this is ugly, but consistency wins. MS Graph API is eventually
 	// consistent, and will only allow changes to the OnPremisesImmutableId if
 	// and only if the UserPrincipalName is not "federated" (meaning is something
 	// else but a *.onmicrosoft.com domain)
@@ -225,7 +221,7 @@ func (c *Client) DeleteUser(uuid string) error {
 		return err
 	}
 
-	if resp.StatusCode != http.StatusNoContent {
+	if resp.StatusCode >= 400 {
 		return fmt.Errorf("Error deleting user user=%s", uuid)
 	}
 	return nil
