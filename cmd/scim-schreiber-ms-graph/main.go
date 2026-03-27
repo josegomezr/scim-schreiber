@@ -81,6 +81,10 @@ func createSCIMServer(cfg Config) (scim.Server, error) {
 		return scim.Server{}, err
 	}
 
+	if err := msgraphClient.NegotiateAccessToken(); err != nil {
+		return scim.Server{}, err
+	}
+
 	config := scim.ServiceProviderConfig{
 		AuthenticationSchemes: []scim.AuthenticationScheme{
 			{
