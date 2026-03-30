@@ -12,14 +12,15 @@ import (
 )
 
 type Config struct {
-	ClientId          string
-	ClientSecret      string
-	OnMicrosoftDomain string
-	TenantId          string
-	TenantDomain      string
-	AuthURL           string
-	GraphAPIBaseURL   string
-	baseURL           *url.URL
+	ClientId           string
+	ClientSecret       string
+	OnMicrosoftDomain  string
+	ReturnGroupMembers bool
+	TenantId           string
+	TenantDomain       string
+	AuthURL            string
+	GraphAPIBaseURL    string
+	baseURL            *url.URL
 }
 
 const msGraphBase = "https://graph.microsoft.com/v1.0"
