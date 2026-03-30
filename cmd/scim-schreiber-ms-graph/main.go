@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strconv"
 
 	"github.com/elimity-com/scim"
 	"github.com/elimity-com/scim/optional"
@@ -12,11 +13,12 @@ import (
 )
 
 type Config struct {
-	ClientId          string
-	ClientSecret      string
-	TenantId          string
-	TenantDomain      string
-	OnMicrosoftDomain string
+	ClientId           string
+	ClientSecret       string
+	TenantId           string
+	TenantDomain       string
+	OnMicrosoftDomain  string
+	ReturnGroupMembers bool
 }
 
 func main() {
@@ -30,12 +32,21 @@ func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: programLevel}))
 	slog.SetDefault(logger)
 
+	returnGroupMembers := false
+	if val, ok := os.LookupEnv("SCIM_SCHREIBER_RETURN_GROUP_MEMBERS"); ok {
+		b, err := strconv.ParseBool(val)
+		if err == nil {
+			returnGroupMembers = b
+		}
+	}
+
 	cfg := Config{
-		ClientId:          os.Getenv("AZURE_CLIENT_ID"),
-		ClientSecret:      os.Getenv("AZURE_CLIENT_SECRET"),
-		TenantId:          os.Getenv("AZURE_TENANT_ID"),
-		TenantDomain:      os.Getenv("AZURE_TENANT_DOMAIN"),
-		OnMicrosoftDomain: os.Getenv("AZURE_ONMICROSOFT_DOMAIN"),
+		ClientId:           os.Getenv("AZURE_CLIENT_ID"),
+		ClientSecret:       os.Getenv("AZURE_CLIENT_SECRET"),
+		TenantId:           os.Getenv("AZURE_TENANT_ID"),
+		TenantDomain:       os.Getenv("AZURE_TENANT_DOMAIN"),
+		OnMicrosoftDomain:  os.Getenv("AZURE_ONMICROSOFT_DOMAIN"),
+		ReturnGroupMembers: returnGroupMembers,
 	}
 
 	server, err := createSCIMServer(cfg)
@@ -75,6 +86,7 @@ func createSCIMServer(cfg Config) (scim.Server, error) {
 		mscfg.TenantId = cfg.TenantId
 		mscfg.TenantDomain = cfg.TenantDomain
 		mscfg.OnMicrosoftDomain = cfg.OnMicrosoftDomain
+		mscfg.ReturnGroupMembers = cfg.ReturnGroupMembers
 	})
 
 	if err != nil {
