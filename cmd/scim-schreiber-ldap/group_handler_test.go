@@ -222,9 +222,8 @@ func (suite *SCIMGroupTestSuite) TestPatch() {
 				}
 			`,
 		},
-		/*TODO Need to fix the patch logic for this to work
-		  "addMember": {
-		  	request: `
+		"addMember": {
+			request: fmt.Sprintf(`
 		  		{
 		  		  "schemas": [
 		  			"urn:ietf:params:scim:api:messages:2.0:PatchOp"
@@ -236,29 +235,33 @@ func (suite *SCIMGroupTestSuite) TestPatch() {
 		  			   "members": [
 		  				   {
 		  						"display": "alex",
-		  						"value": "0565f472-28fe-4d93-83ad-096c66ed4a47"
+		  						"value": "%s"
 		  				   }
 		  			     ]
 		  			   }
 		  			 }
 		  		  ]
 		  		}
-		  	`,
-		  	status: http.StatusOK,
-		  	response: `
+		  	`, testUserUUID),
+			status: http.StatusOK,
+			response: `
 		  		{
-		  		  "displayName" : "testGroupId",
-		  		  "externalId" : "cn=testGroupId,ou=groups,dc=suse,dc=com",
-		  		  "id" : "testGroupId",
-		  		  "members" : [ ],
+		  		  "displayName" : "PATCH-addMember",
+		  		  "externalId" : "cn=group-addMember,ou=groups,dc=suse,dc=com",
+		  		  "id" : "group-addMember",
+				  "members": [
+					{
+					  "value": "test"
+					}
+				  ],
 		  		  "meta" : {
 		  			"resourceType" : "Group",
-		  			"location" : "Groups/testGroupId"
+		  			"location" : "Groups/group-addMember"
 		  		  },
 		  		  "schemas" : [ "urn:ietf:params:model:schemas:core:2.0:Group" ]
 		  		}
 		  	`,
-		  },*/
+		},
 		"addMemberPathStyle": {
 			request: fmt.Sprintf(`
 				{
