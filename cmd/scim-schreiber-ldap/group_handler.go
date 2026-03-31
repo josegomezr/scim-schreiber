@@ -1,10 +1,8 @@
 package main
 
 import (
-	"fmt"
 	"log/slog"
 	"net/http"
-	"reflect"
 
 	"github.com/elimity-com/scim"
 	"github.com/elimity-com/scim/errors"
@@ -232,8 +230,8 @@ func (h GroupHandler) Patch(r *http.Request, id string, operations []scim.PatchO
 	removes = h.scimToLdapAttributes(removes)
 	replaces = h.scimToLdapAttributes(replaces)
 
-	h.transformMemberUUIDtoUID(ldapCtx, adds, "members", "memberUid")
-	h.transformMemberUUIDtoUID(ldapCtx, removes, "members", "memberUid")
+	h.transformMemberUUIDtoUID(ldapCtx, adds, "members.value", "memberUid")
+	h.transformMemberUUIDtoUID(ldapCtx, removes, "members.value", "memberUid")
 
 	err = ldapCtx.UpdateEntry(entry.DN, adds, removes, replaces)
 
@@ -276,55 +274,57 @@ func (h *GroupHandler) transformMemberUUIDtoUID(ldapCtx *LdapUtil, attrmap map[s
 
 }
 
+func convertToLdap(input interface{}, path string, output map[string][]string) {
+	switch input.(type) {
+	case map[string]interface{}:
+		for key, value := range input.(map[string]interface{}) {
+			prefix := path
+			if prefix != "" {
+				prefix += "."
+			}
+			convertToLdap(value, prefix+key, output)
+		}
+		break
+	case string:
+		if output[path] == nil {
+			output[path] = make([]string, 0)
+		}
+
+		output[path] = append(output[path], input.(string))
+		break
+	case []interface{}:
+		for _, value := range input.([]interface{}) {
+			convertToLdap(value, path, output)
+		}
+		break
+	default:
+		slog.Warn("Unknown patch value type", "value", input)
+	}
+}
+
 func classifyPatchOperations(operations []scim.PatchOperation) (map[string][]string, map[string][]string, map[string][]string) {
 	adds := make(map[string][]string)
 	removes := make(map[string][]string)
 	replaces := make(map[string][]string)
 
 	for _, op := range operations {
-		if reflect.ValueOf(op.Value).Kind() == reflect.Slice {
-			for _, singleVal := range CastMultiValue[map[string]interface{}](op.Value) {
-				value := CastSingleValue[string](singleVal["value"])
-
-				switch op.Op {
-				case scim.PatchOperationAdd:
-					adds[op.Path.String()] = append(adds[op.Path.String()], value)
-				case scim.PatchOperationRemove:
-					removes[op.Path.String()] = append(removes[op.Path.String()], value)
-				default:
-					slog.Info("unknown OP", "operation", op.Op, "path", op.Path, "value", singleVal)
-					continue
-				}
-			}
-		} else if reflect.ValueOf(op.Value).Kind() == reflect.Map {
-			for k, v := range op.Value.(map[string]interface{}) {
-				switch op.Op {
-				case scim.PatchOperationAdd:
-					adds[op.Path.String()] = append(adds[op.Path.String()], fmt.Sprintf("%s", v))
-				case scim.PatchOperationRemove:
-					removes[op.Path.String()] = append(removes[op.Path.String()], fmt.Sprintf("%s", v))
-				case scim.PatchOperationReplace:
-					replaces[k] = append(replaces[k], fmt.Sprintf("%s", v))
-
-				default:
-					slog.Info("unknown OP", "operation", op.Op, "path", op.Path, "value", op.Value)
-					continue
-				}
-			}
-
-		} else {
-			switch op.Op {
-			case scim.PatchOperationAdd:
-				adds[op.Path.String()] = append(adds[op.Path.String()], fmt.Sprintf("%s", op.Value))
-			case scim.PatchOperationRemove:
-				removes[op.Path.String()] = append(removes[op.Path.String()], fmt.Sprintf("%s", op.Value))
-			case scim.PatchOperationReplace:
-				replaces[op.Path.String()] = append(replaces[op.Path.String()], fmt.Sprintf("%s", op.Value))
-			default:
-				slog.Info("unknown OP", "operation", op.Op, "path", op.Path, "value", op.Value)
-				continue
-			}
+		path := ""
+		if op.Path != nil {
+			path = op.Path.String()
 		}
+
+		switch op.Op {
+		case scim.PatchOperationAdd:
+			convertToLdap(op.Value, path, adds)
+			break
+		case scim.PatchOperationRemove:
+			convertToLdap(op.Value, path, removes)
+			break
+		case scim.PatchOperationReplace:
+			convertToLdap(op.Value, path, replaces)
+			break
+		}
+
 	}
 
 	return adds, removes, replaces
