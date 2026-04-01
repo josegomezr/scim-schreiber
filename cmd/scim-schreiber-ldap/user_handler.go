@@ -157,7 +157,12 @@ func (h UserHandler) GetAll(r *http.Request, params scim.ListRequestParams) (sci
 	}
 
 	i := 1
-	for entry := range users {
+
+	for entry, err := range users {
+		if err != nil {
+			slog.Error("An error occurred while querying LDAP", "err", err)
+			return scim.Page{}, errors.ScimError{Status: http.StatusInternalServerError, Detail: "LDAP Query failed"}
+		}
 		// Ldap pagination does not support start index. So skip until we find the correct entry
 		if i > (params.StartIndex + params.Count - 1) {
 			// If we wanted to provide the correct result in TotalResults we'd actually have to keep counting here.

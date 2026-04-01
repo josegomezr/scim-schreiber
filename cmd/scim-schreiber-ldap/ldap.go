@@ -146,7 +146,7 @@ func (l *LdapUtil) SearchIter(filter string, baseUid string) iter.Seq2[*ldap.Ent
 
 	return func(yield func(*ldap.Entry, error) bool) {
 		for {
-			slog.Info("Page")
+			slog.Info("LDAP Page", "filter", filter, "base", baseUid, "pagingControl", pagingControl)
 			searchRequest := ldap.NewSearchRequest(
 				baseUid,
 				ldap.ScopeWholeSubtree,
