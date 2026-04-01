@@ -67,10 +67,13 @@ func createSCIMServer(cfg Config) (scim.Server, error) {
 	config := scim.ServiceProviderConfig{
 		AuthenticationSchemes: []scim.AuthenticationScheme{
 			{
-				Type: scim.AuthenticationTypeHTTPBasic,
-				Name: "HTTP Basic",
+				DocumentationURI: optional.NewString("http://someone-will-care.later.suse.com/"),
+				Name:             "HTTP Basic",
+				SpecURI:          optional.NewString("https://datatracker.ietf.org/doc/html/rfc7617"),
+				Type:             scim.AuthenticationTypeHTTPBasic,
 			},
 		},
+		DocumentationURI: optional.NewString("http://someone-will-care.later.suse.com/"),
 		SupportFiltering: true,
 		SupportPatch:     true,
 	}
