@@ -1,0 +1,10 @@
+{
+  "skuId": "1010020026",
+  "kind": "licensing#licenseAssignment",
+  "userId": "felix-test@dev.suse.com",
+  "productName": "Google Workspace",
+  "skuName": "Google Workspace Enterprise Standard",
+  "etags": "\"H0PJuOk1iXiiU1RbEY0GQ45xn0xL0hqSQ1iVu5_X7rk/ykkQoOngjO33xlMKBAAcv9t1PYM\"",
+  "selfLink": "https://licensing.googleapis.com/apps/licensing/v1/product/Google-Apps/sku/1010020026/user/felix-test@dev.suse.com",
+  "productId": "Google-Apps"
+}

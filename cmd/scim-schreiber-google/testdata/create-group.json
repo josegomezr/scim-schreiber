@@ -1,0 +1,8 @@
+{
+  "schemas": [
+    "urn:ietf:params:model:schemas:core:2.0:Group"
+  ],
+  "externalId": "externalGroupId",
+  "displayName": "SCIMSChreiber Test Group",
+  "email": "google-workspace-staging@dev.suse.com"
+}
