@@ -1,0 +1,21 @@
+{
+  "userName": "testuser@dev.suse.com",
+  "name": {
+    "givenName": "Replace",
+    "familyName": "User",
+    "formatted":"Test User"
+  },
+  "displayName": "Display Test",
+  "active": true,
+  "emails": [
+    {
+      "primary": true,
+      "type": "work",
+      "value": "testuser@dev.suse.com"
+    }
+  ],
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+  ],
+  "orgUnitPath": "/Authentik Staging"
+}

@@ -1,0 +1,40 @@
+{
+  "kind": "admin#directory#user",
+  "id": "100994131692123746646",
+  "etag": "\"DcQ1N-bWFowTUUTzr_P6Kb_8lgiFBgpcxrHgSbp-VdA/hbR8SfNLybURdaTaMdx2-us4JsY\"",
+  "primaryEmail": "testuser@dev.suse.com",
+  "name": {
+    "givenName": "Replace",
+    "familyName": "User",
+    "fullName": "Test User",
+    "displayName": "Display Test"
+  },
+  "isAdmin": false,
+  "isDelegatedAdmin": false,
+  "lastLoginTime": "1970-01-01T00:00:00.000Z",
+  "creationTime": "2026-04-20T08:56:15.000Z",
+  "agreedToTerms": false,
+  "suspended": false,
+  "archived": false,
+  "changePasswordAtNextLogin": false,
+  "ipWhitelisted": false,
+  "emails": [
+    {
+      "address": "testuser@dev.suse.com",
+      "primary": true
+    },
+    {
+      "address": "testuser@dev.suse.com.test-google-a.com"
+    }
+  ],
+  "nonEditableAliases": [
+    "testuser@dev.suse.com.test-google-a.com"
+  ],
+  "customerId": "C00000000",
+  "orgUnitPath": "/Authentik Staging",
+  "isMailboxSetup": true,
+  "includeInGlobalAddressList": true,
+  "thumbnailPhotoUrl": "//lh3.googleusercontent.com/a/ACg8ocJdes_xBJbHTFtL7cKGf6i6PRc6QQSUEw75HPbQg651VNLgOA=mo",
+  "thumbnailPhotoEtag": "\"DcQ1N-bWFowTUUTzr_P6Kb_8lgiFBgpcxrHgSbp-VdA/5tjInz4XpCkCBOiBXIsr6zGJzNg\"",
+  "recoveryEmail": ""
+}

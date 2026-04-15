@@ -1,0 +1,18 @@
+{
+  "kind": "admin#directory#user",
+  "id": "100994131692123746646",
+  "etag": "\"DcQ1N-bWFowTUUTzr_P6Kb_8lgiFBgpcxrHgSbp-VdA/V2BheiOUdAKE8Vz1qqXm2KxNuwM\"",
+  "primaryEmail": "testuser@dev.suse.com",
+  "name": {
+    "givenName": "Test",
+    "familyName": "User",
+    "fullName": "Test User",
+    "displayName": "Display Test"
+  },
+  "isAdmin": false,
+  "isDelegatedAdmin": false,
+  "creationTime": "2026-04-20T08:56:15.000Z",
+  "customerId": "C00000000",
+  "orgUnitPath": "/Authentik Staging",
+  "isMailboxSetup": false
+}

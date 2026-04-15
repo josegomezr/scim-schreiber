@@ -1,0 +1,51 @@
+{
+  "kind": "admin#directory#users",
+  "etag": "\"DcQ1N-bWFowTUUTzr_P6Kb_8lgiFBgpcxrHgSbp-VdA/paWpkWTYrZ5ytXhimzA6w6vRh9Q\"",
+  "users": [
+    {
+      "kind": "admin#directory#user",
+      "id": "104965396198408263080",
+      "etag": "\"DcQ1N-bWFowTUUTzr_P6Kb_8lgiFBgpcxrHgSbp-VdA/QhIFIPQsCzFXmBTztILvyWS83PA\"",
+      "primaryEmail": "felix-test@dev.suse.com",
+      "name": {
+        "givenName": "Felix",
+        "familyName": "Test",
+        "fullName": "Felix Test"
+      },
+      "isAdmin": false,
+      "isDelegatedAdmin": false,
+      "lastLoginTime": "2026-04-16T11:56:16.000Z",
+      "creationTime": "2026-04-16T11:49:49.000Z",
+      "agreedToTerms": true,
+      "suspended": false,
+      "archived": false,
+      "changePasswordAtNextLogin": true,
+      "ipWhitelisted": false,
+      "emails": [
+        {
+          "address": "felix-test@dev.suse.com",
+          "primary": true
+        },
+        {
+          "address": "felix-test@dev.suse.com.test-google-a.com"
+        }
+      ],
+      "languages": [
+        {
+          "languageCode": "en",
+          "preference": "preferred"
+        }
+      ],
+      "nonEditableAliases": [
+        "felix-test@dev.suse.com.test-google-a.com"
+      ],
+      "customerId": "C00000000",
+      "orgUnitPath": "/Authentik Staging",
+      "isMailboxSetup": true,
+      "isEnrolledIn2Sv": false,
+      "isEnforcedIn2Sv": true,
+      "includeInGlobalAddressList": true,
+      "isGuestUser": false
+    }
+  ]
+}
