@@ -83,7 +83,7 @@ func principalFromFilter(filterValidator *filter.Validator) (string, error) {
 
 func jiraUserToUserResource(entry *jira.User) scim.Resource {
 	return scim.Resource{
-		ID:         entry.Key,
+		ID:         entry.Name,
 		ExternalID: optional.NewString(entry.Key),
 		Attributes: map[string]interface{}{
 			"rawUserLocation": entry.Self,
