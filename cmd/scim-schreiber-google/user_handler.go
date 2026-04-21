@@ -61,7 +61,13 @@ func (h UserHandler) Create(_ *http.Request, attributes scim.ResourceAttributes)
 		return scim.Resource{}, scimerrors.ScimError{Status: http.StatusInternalServerError, Detail: fmt.Sprintf("%s", err)}
 	}
 
-	return userToUserResource(user), nil
+	wantLicenses, err := h.updateLicenses(user, attributes)
+	if err != nil {
+		return scim.Resource{}, err
+	}
+	resource := userToUserResource(user)
+	resource.Attributes["licenses"] = wantLicenses
+	return resource, nil
 }
 
 func (h UserHandler) Delete(_ *http.Request, id string) error {
@@ -277,19 +283,34 @@ func (h UserHandler) Replace(_ *http.Request, id string, attributes scim.Resourc
 		return scim.Resource{}, scimerrors.ScimError{Status: http.StatusInternalServerError, Detail: fmt.Sprintf("%s", err)}
 	}
 
+	wantLicenses, err := h.updateLicenses(user, attributes)
+	if err != nil {
+		return scim.Resource{}, err
+	}
+
+	resource := userToUserResource(user)
+	resource.Attributes["licenses"] = wantLicenses
+	return resource, nil
+}
+
+func (h UserHandler) updateLicenses(user *admin.User, attributes scim.ResourceAttributes) ([]map[string]interface{}, error) {
 	hasLicenses, err := h.getLicenses(user)
 
 	if err != nil {
-		return scim.Resource{}, scimerrors.ScimError{Status: http.StatusInternalServerError, Detail: fmt.Sprintf("%s", err)}
+		return nil, scimerrors.ScimError{Status: http.StatusInternalServerError, Detail: fmt.Sprintf("%s", err)}
 	}
 
-	wantLicensesTmp, ok := attributes["licenses"]
-
-	if !ok {
-		wantLicensesTmp = []map[string]interface{}{}
+	wantLicenses := []map[string]interface{}{}
+	// Remove licenses is user is marked as inactive
+	if !user.Suspended {
+		tmp, ok := attributes["licenses"]
+		if ok {
+			tmpCast, ok := tmp.([]map[string]interface{})
+			if ok {
+				wantLicenses = tmpCast
+			}
+		}
 	}
-
-	wantLicenses := wantLicensesTmp.([]map[string]interface{})
 
 REMOVE:
 	for _, l := range hasLicenses {
@@ -301,7 +322,7 @@ REMOVE:
 
 		_, err := h.licenseClient.LicenseAssignments.Delete(l.ProductId, l.SkuId, user.PrimaryEmail).Do()
 		if err != nil {
-			return scim.Resource{}, scimerrors.ScimError{Status: http.StatusInternalServerError, Detail: fmt.Sprintf("%s", err)}
+			return nil, scimerrors.ScimError{Status: http.StatusInternalServerError, Detail: fmt.Sprintf("%s", err)}
 		}
 
 	}
@@ -319,11 +340,8 @@ ADD:
 		}
 		_, err := h.licenseClient.LicenseAssignments.Insert(w["product"].(string), w["sku"].(string), &license).Do()
 		if err != nil {
-			return scim.Resource{}, scimerrors.ScimError{Status: http.StatusInternalServerError, Detail: fmt.Sprintf("%s", err)}
+			return nil, scimerrors.ScimError{Status: http.StatusInternalServerError, Detail: fmt.Sprintf("%s", err)}
 		}
 	}
-
-	resource := userToUserResource(user)
-	resource.Attributes["licenses"] = wantLicenses
-	return resource, nil
+	return wantLicenses, nil
 }

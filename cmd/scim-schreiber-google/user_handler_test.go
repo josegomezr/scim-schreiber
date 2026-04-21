@@ -95,6 +95,8 @@ func (suite *SCIMUserTestSuite) TestCreateUser() {
 
 	mockToken(t)
 	mock(t, "https://admin.googleapis.com/admin/directory/v1/users", 201, "create-user-response.json")
+	gock.New("https://licensing.googleapis.com").Get("/apps/licensing/v1/product/Google-Apps/sku/1010020026/user/testuser@dev.suse.com").Reply(404)
+	gock.New("https://licensing.googleapis.com").Post("/apps/licensing/v1/product/Google-Apps/sku/1010020026/user/testuser@dev.suse.com").Reply(http.StatusNoContent)
 
 	request, _ := http.NewRequest(http.MethodPost, "/Users", requestBody)
 
