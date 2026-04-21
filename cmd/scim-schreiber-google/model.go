@@ -77,7 +77,7 @@ var UserSchema = schema.Schema{
 			Required: true,
 		})),
 		schema.ComplexCoreAttribute(schema.ComplexParams{
-			Name:        "licenses",
+			Name:        "entitlements",
 			Required:    false,
 			MultiValued: true,
 			SubAttributes: []schema.SimpleParams{

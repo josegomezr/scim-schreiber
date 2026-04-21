@@ -106,24 +106,26 @@ func resourceToGroup(resourceAttrs map[string]interface{}) *admin.Group {
 
 func (h GroupHandler) GetAll(r *http.Request, params scim.ListRequestParams) (scim.Page, error) {
 	slog.Info("GET /v2/Groups", "params", params)
-	filterExpr := ""
 	principal, err := displayNameFromFilter(params.FilterValidator)
 	if err != nil {
 		return scim.Page{}, err
 	}
 
+	// TODO Pagination
+	request := h.client.Groups.List().Domain(h.cfg.Domain)
+
 	if principal != "" {
-		filterExpr = fmt.Sprintf(`name eq '%s'`, principal)
+		filterExpr := fmt.Sprintf(`name='%s'`, principal)
+		request = request.Query(filterExpr)
 	}
 
-	resources := make([]scim.Resource, 0)
-	// TODO Pagination
-	groups, err := h.client.Groups.List().Query(filterExpr).Do()
+	groups, err := request.Do()
 
 	if err != nil {
 		return scim.Page{}, err
 	}
 
+	resources := make([]scim.Resource, 0)
 	for _, group := range groups.Groups {
 		resources = append(resources, groupToGroupResource(group))
 	}
@@ -156,7 +158,7 @@ func (h GroupHandler) Patch(r *http.Request, id string, operations []scim.PatchO
 			return scim.Resource{}, scimerrors.ScimError{Status: http.StatusNotImplemented, Detail: "Only membership add/remove is allowed"}
 		}
 	}
-	/* TODO Implement
+
 	var pushErrors string
 
 	// members are guaranteed to be multivalued
@@ -166,12 +168,15 @@ func (h GroupHandler) Patch(r *http.Request, id string, operations []scim.PatchO
 			value := casting.SingleValue[string](singleVal["value"])
 			switch op.Op {
 			case scim.PatchOperationAdd:
-				if err := h.client.AddUserToGroup(value, id); err != nil {
+				member := admin.Member{
+					Email: value,
+				}
+				if _, err := h.client.Members.Insert(id, &member).Do(); err != nil {
 					pushErrors += err.Error() + "\n"
 					slog.Warn("Error adding user from group", "user", value, "error", err)
 				}
 			case scim.PatchOperationRemove:
-				if err := h.client.RemoveUserFromGroup(value, id); err != nil {
+				if err := h.client.Members.Delete(id, value).Do(); err != nil {
 					pushErrors += err.Error() + "\n"
 					slog.Warn("Error removing user from group", "user", value, "error", err)
 				}
@@ -184,7 +189,8 @@ func (h GroupHandler) Patch(r *http.Request, id string, operations []scim.PatchO
 
 	if len(pushErrors) > 0 {
 		return scim.Resource{}, scimerrors.ScimError{Status: http.StatusInternalServerError, Detail: pushErrors}
-	}*/
+	}
+
 	return scim.Resource{}, nil
 }
 

@@ -1,0 +1,32 @@
+{
+  "kind": "admin#directory#groups",
+  "etag": "\"DcQ1N-bWFowTUUTzr_P6Kb_8lgiFBgpcxrHgSbp-VdA/DFKY_t69AnNE0fzrAxtib7CJVDg\"",
+  "groups": [
+    {
+      "kind": "admin#directory#group",
+      "id": "04iylrwe1ryosyl",
+      "etag": "\"DcQ1N-bWFowTUUTzr_P6Kb_8lgiFBgpcxrHgSbp-VdA/2M_ysMr-t4PMM2aF3Byt-m7kVZU\"",
+      "email": "abuse@dev.suse.com",
+      "name": "abuse",
+      "directMembersCount": "0",
+      "description": "",
+      "adminCreated": true,
+      "nonEditableAliases": [
+        "abuse@dev.suse.com.test-google-a.com"
+      ]
+    },
+    {
+      "kind": "admin#directory#group",
+      "id": "00tyjcwt2wgxqro",
+      "etag": "\"DcQ1N-bWFowTUUTzr_P6Kb_8lgiFBgpcxrHgSbp-VdA/E4fPoSFGSG3OqkVYJ_0-4RqJkRo\"",
+      "email": "postmaster@dev.suse.com",
+      "name": "postmaster",
+      "directMembersCount": "0",
+      "description": "",
+      "adminCreated": true,
+      "nonEditableAliases": [
+        "postmaster@dev.suse.com.test-google-a.com"
+      ]
+    }
+  ]
+}

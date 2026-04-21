@@ -149,7 +149,7 @@ func (suite *SCIMUserTestSuite) TestReplaceUser() {
 				"formatted" : "Test User",
 				"givenName" : "Replace"
 			  },
-			  "licenses": [],
+			  "entitlements": [],
 			  "orgUnitPath" : "/Authentik Staging",
 			  "schemas" : [ "urn:ietf:params:model:schemas:core:2.0:User" ],
 			  "userName" : "testuser@dev.suse.com"
@@ -265,7 +265,7 @@ func (suite *SCIMUserTestSuite) TestGetUser() {
             { "type": "work", "primary": true, "value": "felix-test@dev.suse.com" }
        ],
        "orgUnitPath":"/Authentik Staging",
-	  "licenses": [
+	  "entitlements": [
 		{"product":"Google-Apps", "sku":"1010020026"}
 	  ],
        "meta": {

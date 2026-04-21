@@ -13,6 +13,8 @@ import (
 	admin "google.golang.org/api/admin/directory/v1"
 	"google.golang.org/api/licensing/v1"
 	"google.golang.org/api/option"
+
+	"github.com/josegomezr/scim-schreiber-ldap/internal/model"
 )
 
 type Config struct {
@@ -179,7 +181,7 @@ func createSCIMServer(cfg Config, adminClient *admin.Service, licenseClient *lic
 				licenseClient: licenseClient,
 			},
 		},
-		/*{
+		{
 			ID:          optional.NewString("Group"),
 			Name:        "Group",
 			Endpoint:    "/Groups",
@@ -187,9 +189,9 @@ func createSCIMServer(cfg Config, adminClient *admin.Service, licenseClient *lic
 			Schema:      model.GroupSchema,
 			Handler: GroupHandler{
 				cfg:    &cfg,
-				client: client,
+				client: adminClient,
 			},
-		},*/
+		},
 	}
 
 	serverArgs := &scim.ServerArgs{

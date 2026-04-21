@@ -66,7 +66,7 @@ func (h UserHandler) Create(_ *http.Request, attributes scim.ResourceAttributes)
 		return scim.Resource{}, err
 	}
 	resource := userToUserResource(user)
-	resource.Attributes["licenses"] = wantLicenses
+	resource.Attributes["entitlements"] = wantLicenses
 	return resource, nil
 }
 
@@ -108,7 +108,7 @@ func (h UserHandler) Get(r *http.Request, id string) (scim.Resource, error) {
 		return scim.Resource{}, err
 	}
 
-	resource.Attributes["licenses"] = licenseToResource(licensesForUser)
+	resource.Attributes["entitlements"] = licenseToResource(licensesForUser)
 
 	return resource, nil
 }
@@ -289,7 +289,7 @@ func (h UserHandler) Replace(_ *http.Request, id string, attributes scim.Resourc
 	}
 
 	resource := userToUserResource(user)
-	resource.Attributes["licenses"] = wantLicenses
+	resource.Attributes["entitlements"] = wantLicenses
 	return resource, nil
 }
 
@@ -303,7 +303,7 @@ func (h UserHandler) updateLicenses(user *admin.User, attributes scim.ResourceAt
 	wantLicenses := []map[string]interface{}{}
 	// Remove licenses is user is marked as inactive
 	if !user.Suspended {
-		tmp, ok := attributes["licenses"]
+		tmp, ok := attributes["entitlements"]
 		if ok {
 			tmpCast, ok := tmp.([]map[string]interface{})
 			if ok {
