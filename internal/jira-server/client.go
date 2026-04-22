@@ -8,9 +8,10 @@ import (
 )
 
 type Config struct {
-	Token     string
-	ServerUrl string
-	baseURL   *url.URL
+	Token                  string
+	ServerUrl              string
+	IncludeMembersInGroups bool
+	baseURL                *url.URL
 }
 
 type Client struct {

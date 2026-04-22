@@ -89,12 +89,15 @@ func (c *Client) GetGroup(displayName string) (*Group, error) {
 		return nil, err
 	}
 
-	memResp, err := c.GetGroupMembers(displayName)
-	if err != nil {
-		return nil, err
-	}
+	groupResp.Members = []User{}
+	if c.config.IncludeMembersInGroups {
+		memResp, err := c.GetGroupMembers(displayName)
+		if err != nil {
+			return nil, err
+		}
 
-	groupResp.Members = memResp
+		groupResp.Members = memResp
+	}
 
 	return &groupResp, nil
 }

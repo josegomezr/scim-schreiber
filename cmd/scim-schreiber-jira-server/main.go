@@ -12,8 +12,9 @@ import (
 )
 
 type Config struct {
-	Token     string
-	ServerUrl string
+	Token                  string
+	ServerUrl              string
+	IncludeMembersInGroups bool
 }
 
 func main() {
@@ -28,8 +29,9 @@ func main() {
 	slog.SetDefault(logger)
 
 	cfg := Config{
-		Token:     os.Getenv("JIRA_SERVER_TOKEN"),
-		ServerUrl: os.Getenv("JIRA_SERVER_URL"),
+		Token:                  os.Getenv("JIRA_SERVER_TOKEN"),
+		ServerUrl:              os.Getenv("JIRA_SERVER_URL"),
+		IncludeMembersInGroups: os.Getenv("JIRA_INCLUDE_MEMBERS_IN_GROUPS") == "1",
 	}
 
 	server, err := createSCIMServer(cfg)
@@ -65,6 +67,7 @@ func startHttpServer(server scim.Server, err error) {
 func createSCIMServer(cfg Config) (scim.Server, error) {
 	jiraClient, err := jira.NewClient(func(mscfg *jira.Config) {
 		mscfg.Token = cfg.Token
+		mscfg.IncludeMembersInGroups = cfg.IncludeMembersInGroups
 		mscfg.ServerUrl = cfg.ServerUrl
 	})
 
