@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/elimity-com/scim"
@@ -162,36 +161,51 @@ func (suite *SCIMUserTestSuite) TestReplaceUser() {
 func (suite *SCIMUserTestSuite) TestPatchUser() {
 	t := suite.T()
 
-	requestBody := `
-	        {
-	          "schemas": [
-	            "urn:ietf:params:scim:api:messages:2.0:PatchOp"
-	          ],
-	          "Operations": [
-	             {
-	               "op":"replace",
-	               "path":"displayName",
-	               "value":"Patched Name"
-	             }
-	          ]
-	        }
-	    `
+	file, err := os.Open(filepath.Join(".", "testdata", "user_change.json"))
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, file.Close())
+	})
 
-	request, _ := http.NewRequest(http.MethodPatch, "/Users/"+testUserUUID, strings.NewReader(requestBody))
+	defer gock.Off()
+	mockToken(t)
+	mock(t, "https://admin.googleapis.com/admin/directory/v1/users/"+testUserUUID, 200, "replace-user-response.json")
+	mockOk(t, "https://licensing.googleapis.com/apps/licensing/v1/product/Google-Apps/sku/1010020026/user/testuser@dev.suse.com", "get_license.json")
+
+	gock.New("https://licensing.googleapis.com").Delete("/apps/licensing/v1/product/Google-Apps/sku/1010020026/user/testuser@dev.suse.com").Reply(http.StatusNoContent)
+
+	request, _ := http.NewRequest(http.MethodPatch, "/Users/"+testUserUUID, file)
 
 	response := httptest.NewRecorder()
 	suite.server.ServeHTTP(response, request)
 
-	assert.Equal(t, http.StatusNotImplemented, response.Code)
+	assert.Equal(t, http.StatusOK, response.Code)
 	got := response.Body.String()
 	want := `
-	        {
-	          "status": "501",
-	          "detail":"Patch is not implemented for users",
-	          "schemas": [
-	            "urn:ietf:params:scim:api:messages:2.0:Error"
-	          ]
-	        }
+			{
+			  "active" : true,
+			  "displayName" : "Display Test",
+			  "emails" : [ {
+				"primary" : true,
+				"type" : "work",
+				"value" : "testuser@dev.suse.com"
+			  }],
+			  "externalId" : "testuser@dev.suse.com",
+			  "id" : "100994131692123746646",
+			  "meta" : {
+				"resourceType" : "User",
+				"location" : "Users/100994131692123746646"
+			  },
+			  "name" : {
+				"familyName" : "User",
+				"formatted" : "Test User",
+				"givenName" : "Replace"
+			  },
+			  "entitlements": [],
+			  "orgUnitPath" : "/Authentik Staging",
+			  "schemas" : [ "urn:ietf:params:model:schemas:core:2.0:User" ],
+			  "userName" : "testuser@dev.suse.com"
+			}
 	    `
 
 	assert.JSONEq(t, want, got)

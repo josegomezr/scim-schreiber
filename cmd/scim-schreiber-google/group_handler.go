@@ -150,9 +150,9 @@ func (h GroupHandler) Patch(r *http.Request, id string, operations []scim.PatchO
 
 	for _, op := range operations {
 		switch op.Op {
-		case "add":
+		case scim.PatchOperationAdd:
 			fallthrough
-		case "remove":
+		case scim.PatchOperationRemove:
 			continue
 		default:
 			return scim.Resource{}, scimerrors.ScimError{Status: http.StatusNotImplemented, Detail: "Only membership add/remove is allowed"}

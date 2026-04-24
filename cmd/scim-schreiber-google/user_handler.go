@@ -11,6 +11,7 @@ import (
 	"github.com/elimity-com/scim"
 	scimerrors "github.com/elimity-com/scim/errors"
 	"github.com/elimity-com/scim/optional"
+	"github.com/scim2/filter-parser/v2"
 	admin "google.golang.org/api/admin/directory/v1"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/licensing/v1"
@@ -264,14 +265,40 @@ func (h UserHandler) GetAll(r *http.Request, params scim.ListRequestParams) (sci
 	}, nil
 }
 
+func isEmptyPath(path *filter.Path) bool {
+	return path == nil || path.String() == ""
+}
+
 func (h UserHandler) Patch(_ *http.Request, id string, operations []scim.PatchOperation) (scim.Resource, error) {
 	slog.Info("PATCH /v2/Users", "id", id, "operations", operations)
-	return scim.Resource{}, scimerrors.ScimError{Status: http.StatusNotImplemented, Detail: "Patch is not implemented for users"}
+
+	if len(operations) != 1 {
+		return scim.Resource{}, scimerrors.ScimErrorBadRequest("Only one replace is allowed")
+	}
+
+	operation := operations[0]
+
+	if operation.Op != scim.PatchOperationReplace || !isEmptyPath(operation.Path) {
+		return scim.Resource{}, scimerrors.ScimError{Status: http.StatusNotImplemented, Detail: "Only full replace is allowed"}
+	}
+
+	attributes, ok := operation.Value.(map[string]interface{})
+
+	if !ok {
+		return scim.Resource{}, scimerrors.ScimErrorBadRequest("Value must be a JSON object")
+	}
+
+	return h.updateUser(attributes, id)
+
 }
 
 func (h UserHandler) Replace(_ *http.Request, id string, attributes scim.ResourceAttributes) (scim.Resource, error) {
 	slog.Info("PUT /v2/Users", "id", id, "attributes", attributes)
 
+	return h.updateUser(attributes, id)
+}
+
+func (h UserHandler) updateUser(attributes scim.ResourceAttributes, id string) (scim.Resource, error) {
 	userRequest, err := resourceToUser(attributes)
 
 	if err != nil {

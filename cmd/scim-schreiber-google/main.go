@@ -165,6 +165,7 @@ func createSCIMServer(cfg Config, adminClient *admin.Service, licenseClient *lic
 		},
 		MaxResults:       100,
 		SupportFiltering: true,
+		SupportPatch:     true,
 		DocumentationURI: optional.NewString("http://nobody.cares/"),
 	}
 
