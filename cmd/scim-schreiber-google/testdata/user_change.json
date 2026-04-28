@@ -1,0 +1,41 @@
+{
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
+  "Operations": [
+    {
+      "op": "replace",
+      "path": null,
+      "value":
+      {
+        "userName": "testuser@dev.suse.com",
+        "id": "108616741917063296671",
+        "name": {
+          "givenName": "Replace",
+          "familyName": "User",
+          "formatted":"Test User"
+        },
+        "displayName": "Display Test",
+        "active": true,
+        "emails": [
+          {
+            "primary": true,
+            "type": "work",
+            "value": "testuser@dev.suse.com"
+          }
+        ],
+        "entitlements": [
+          {
+            "value": "Google Workspace Enterprise Standard",
+            "type": "license"
+          }
+        ],
+        "schemas": [
+          "urn:ietf:params:scim:schemas:core:2.0:User"
+        ],
+        "externalId": "d06de84c2ddc56242f7511ede05cd3d968d045b0c94603e7f2edffae250b0f56",
+        "orgUnitPath": "/Authentik Staging"
+      }
+    }
+  ]
+}
