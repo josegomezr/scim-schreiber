@@ -14,6 +14,7 @@ import (
 	"google.golang.org/api/licensing/v1"
 	"google.golang.org/api/option"
 
+	"github.com/josegomezr/scim-schreiber-ldap/internal/logging"
 	"github.com/josegomezr/scim-schreiber-ldap/internal/model"
 )
 
@@ -69,7 +70,8 @@ func startHttpServer(server scim.Server, err error) {
 		w.WriteHeader(200)
 	})
 
-	mux.Handle("/", server)
+	accessLogger := logging.NewAccessLogger(server)
+	mux.Handle("/", accessLogger)
 
 	listenAddr := ":9440"
 	slog.Info("Listening", "listenAddr", listenAddr)

@@ -82,11 +82,11 @@ var UserSchema = schema.Schema{
 			MultiValued: true,
 			SubAttributes: []schema.SimpleParams{
 				schema.SimpleStringParams(schema.StringParams{
-					Name:     "product",
+					Name:     "value",
 					Required: true,
 				}),
 				schema.SimpleStringParams(schema.StringParams{
-					Name:     "sku",
+					Name:     "type",
 					Required: true,
 				}),
 			},

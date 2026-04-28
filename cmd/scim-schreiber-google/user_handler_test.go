@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -16,7 +15,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"golang.org/x/oauth2/google"
 	admin "google.golang.org/api/admin/directory/v1"
 	"google.golang.org/api/licensing/v1"
 	"google.golang.org/api/option"
@@ -30,26 +28,6 @@ type SCIMUserTestSuite struct {
 	suite.Suite
 	ctx    context.Context
 	server scim.Server
-}
-
-func createRealApiClient(cfg *Config) (*admin.Service, error) {
-	b, err := os.ReadFile(cfg.Credentials)
-	if err != nil {
-		log.Fatalf("Unable to read client secret file: %v", err)
-		return nil, err
-	}
-
-	scopes := []string{admin.AdminDirectoryUserScope, admin.AdminDirectoryGroupScope}
-
-	config, err := google.JWTConfigFromJSON(b, scopes...)
-
-	if err != nil {
-		log.Fatalf("Unable to parse client secret file to config: %v", err)
-		return nil, err
-	}
-
-	ctx := context.Background()
-	return createAdminClient(ctx, option.WithHTTPClient(config.Client(ctx)))
 }
 
 func createApiClientWithoutCredentials() (*admin.Service, error) {
@@ -201,7 +179,12 @@ func (suite *SCIMUserTestSuite) TestPatchUser() {
 				"formatted" : "Test User",
 				"givenName" : "Replace"
 			  },
-			  "entitlements": [],
+			  "entitlements": [
+                {
+					"value": "Google Workspace Enterprise Standard",
+					"type": "license"
+                }
+              ],
 			  "orgUnitPath" : "/Authentik Staging",
 			  "schemas" : [ "urn:ietf:params:model:schemas:core:2.0:User" ],
 			  "userName" : "testuser@dev.suse.com"

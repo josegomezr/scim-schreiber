@@ -27,18 +27,33 @@ type UserHandler struct {
 }
 
 type Product struct {
-	Id   string
-	Skus []string
+	ProductId string
+	SkuId     string
 }
 
 // https://developers.google.com/workspace/admin/licensing/v1/how-tos/products
-var Products = []Product{
-	{
-		Id: "Google-Apps",
-		Skus: []string{
-			"1010020026", // Google Workspace Enterprise Standard
-		},
+var Products = map[string]Product{
+	"Google Workspace Enterprise Standard": {
+		ProductId: "Google-Apps",
+		SkuId:     "1010020026",
 	},
+}
+
+var ReverseProductMap = reverseProductMap(Products)
+
+func reverseProductMap(productMap map[string]Product) map[string]map[string]string {
+	m := make(map[string]map[string]string)
+
+	for skuName, product := range productMap {
+		productId := product.ProductId
+		skuId := product.SkuId
+		if m[productId] == nil {
+			m[productId] = make(map[string]string)
+		}
+		m[productId][skuId] = skuName
+	}
+
+	return m
 }
 
 func (h UserHandler) Create(_ *http.Request, attributes scim.ResourceAttributes) (scim.Resource, error) {
@@ -84,7 +99,7 @@ func (h UserHandler) Delete(_ *http.Request, id string) error {
 // Get the user.
 // id: Identifies the user in the API request. The value can be the
 // user's primary email address, alias email address, or unique user ID.
-func (h UserHandler) Get(r *http.Request, id string) (scim.Resource, error) {
+func (h UserHandler) Get(_ *http.Request, id string) (scim.Resource, error) {
 	slog.Info("GET /v2/Users", "id", id)
 
 	if id == "" {
@@ -114,34 +129,32 @@ func (h UserHandler) Get(r *http.Request, id string) (scim.Resource, error) {
 	return resource, nil
 }
 
-func (h UserHandler) getLicenses(user *admin.User) ([]*licensing.LicenseAssignment, error) {
-	licensesForUser := make([]*licensing.LicenseAssignment, 0)
+func (h UserHandler) getLicenses(user *admin.User) ([]Product, error) {
+	licensesForUser := make([]Product, 0)
 
 	for _, product := range Products {
-		for _, sku := range product.Skus {
-			assignment, err := h.licenseClient.LicenseAssignments.Get(product.Id, sku, user.PrimaryEmail).Do()
+		_, err := h.licenseClient.LicenseAssignments.Get(product.ProductId, product.SkuId, user.PrimaryEmail).Do()
 
-			if err != nil {
-				var googleErr *googleapi.Error
-				if errors.As(err, &googleErr) && googleErr.Code == http.StatusNotFound {
-					continue
-				}
-
-				return nil, err
+		if err != nil {
+			var googleErr *googleapi.Error
+			if errors.As(err, &googleErr) && googleErr.Code == http.StatusNotFound {
+				continue
 			}
 
-			licensesForUser = append(licensesForUser, assignment)
+			return nil, err
 		}
+
+		licensesForUser = append(licensesForUser, product)
 	}
 	return licensesForUser, nil
 }
 
-func licenseToResource(licenses []*licensing.LicenseAssignment) []map[string]interface{} {
+func licenseToResource(licenses []Product) []map[string]interface{} {
 	out := make([]map[string]interface{}, 0, len(licenses))
 	for _, assignment := range licenses {
 		out = append(out, map[string]interface{}{
-			"product": assignment.ProductId,
-			"sku":     assignment.SkuId,
+			"value": ReverseProductMap[assignment.ProductId][assignment.SkuId],
+			"type":  "license",
 		})
 	}
 	return out
@@ -211,12 +224,14 @@ func resourceToUser(resourceAttrs map[string]interface{}) (*admin.User, error) {
 	}
 
 	if primaryEmail == "" {
+		slog.Warn("Primary email not found")
 		return nil, scimerrors.ScimErrorBadRequest("Need a primary email")
 	}
 
 	userName := casting.SingleValue[string](resourceAttrs["userName"])
 
 	if primaryEmail != userName {
+		slog.Warn("Need a primary email to match username")
 		return nil, scimerrors.ScimErrorBadRequest("Need a primary email to match username")
 	}
 
@@ -233,10 +248,11 @@ func resourceToUser(resourceAttrs map[string]interface{}) (*admin.User, error) {
 	}, nil
 }
 
-func (h UserHandler) GetAll(r *http.Request, params scim.ListRequestParams) (scim.Page, error) {
+func (h UserHandler) GetAll(_ *http.Request, params scim.ListRequestParams) (scim.Page, error) {
 	slog.Info("GET /v2/Users", "params", params)
 	principal, err := model.PrincipalFromFilter(params.FilterValidator)
 	if err != nil {
+		slog.Info("Invalid filter", "err", err)
 		return scim.Page{}, err
 	}
 
@@ -273,18 +289,21 @@ func (h UserHandler) Patch(_ *http.Request, id string, operations []scim.PatchOp
 	slog.Info("PATCH /v2/Users", "id", id, "operations", operations)
 
 	if len(operations) != 1 {
+		slog.Warn("Only one replace is allowed")
 		return scim.Resource{}, scimerrors.ScimErrorBadRequest("Only one replace is allowed")
 	}
 
 	operation := operations[0]
 
 	if operation.Op != scim.PatchOperationReplace || !isEmptyPath(operation.Path) {
+		slog.Warn("Only full replace is allowed")
 		return scim.Resource{}, scimerrors.ScimError{Status: http.StatusNotImplemented, Detail: "Only full replace is allowed"}
 	}
 
 	attributes, ok := operation.Value.(map[string]interface{})
 
 	if !ok {
+		slog.Warn("Value must be a JSON object")
 		return scim.Resource{}, scimerrors.ScimErrorBadRequest("Value must be a JSON object")
 	}
 
@@ -327,14 +346,20 @@ func (h UserHandler) updateLicenses(user *admin.User, attributes scim.ResourceAt
 		return nil, scimerrors.ScimError{Status: http.StatusInternalServerError, Detail: fmt.Sprintf("%s", err)}
 	}
 
-	wantLicenses := []map[string]interface{}{}
+	wantLicenses := []Product{}
 	// Remove licenses is user is marked as inactive
 	if !user.Suspended {
 		tmp, ok := attributes["entitlements"]
 		if ok {
-			tmpCast, ok := tmp.([]map[string]interface{})
+			tmpCast, ok := tmp.([]interface{})
 			if ok {
-				wantLicenses = tmpCast
+				for _, element := range tmpCast {
+					if license, ok := element.(map[string]interface{}); ok {
+						if license["type"] == "license" {
+							wantLicenses = append(wantLicenses, Products[license["value"].(string)])
+						}
+					}
+				}
 			}
 		}
 	}
@@ -342,13 +367,18 @@ func (h UserHandler) updateLicenses(user *admin.User, attributes scim.ResourceAt
 REMOVE:
 	for _, l := range hasLicenses {
 		for _, w := range wantLicenses {
-			if l.ProductId == w["product"].(string) && l.SkuId == w["sku"].(string) {
+			if l.ProductId == w.ProductId && l.SkuId == w.SkuId {
 				continue REMOVE
 			}
 		}
 
 		_, err := h.licenseClient.LicenseAssignments.Delete(l.ProductId, l.SkuId, user.PrimaryEmail).Do()
 		if err != nil {
+			var googleErr *googleapi.Error
+			if errors.As(err, &googleErr) && googleErr.Code == http.StatusBadRequest {
+				// This means that the license is auto-assigned and can't be removed manually.
+				continue
+			}
 			return nil, scimerrors.ScimError{Status: http.StatusInternalServerError, Detail: fmt.Sprintf("%s", err)}
 		}
 
@@ -357,7 +387,7 @@ REMOVE:
 ADD:
 	for _, w := range wantLicenses {
 		for _, l := range hasLicenses {
-			if l.ProductId == w["product"].(string) && l.SkuId == w["sku"].(string) {
+			if l.ProductId == w.ProductId && l.SkuId == w.SkuId {
 				continue ADD
 			}
 		}
@@ -365,10 +395,10 @@ ADD:
 		license := licensing.LicenseAssignmentInsert{
 			UserId: user.PrimaryEmail,
 		}
-		_, err := h.licenseClient.LicenseAssignments.Insert(w["product"].(string), w["sku"].(string), &license).Do()
+		_, err := h.licenseClient.LicenseAssignments.Insert(w.ProductId, w.SkuId, &license).Do()
 		if err != nil {
 			return nil, scimerrors.ScimError{Status: http.StatusInternalServerError, Detail: fmt.Sprintf("%s", err)}
 		}
 	}
-	return wantLicenses, nil
+	return licenseToResource(wantLicenses), nil
 }
