@@ -12,7 +12,6 @@ import (
 	"github.com/go-ldap/ldap/v3"
 	scim_filter_parser "github.com/scim2/filter-parser/v2"
 
-	"github.com/josegomezr/scim-schreiber-ldap/internal/model"
 	"github.com/josegomezr/scim-schreiber-ldap/internal/casting"
 	"github.com/josegomezr/scim-schreiber-ldap/internal/model"
 )

@@ -175,17 +175,40 @@ func (h GroupHandler) Patch(r *http.Request, id string, operations []scim.PatchO
 
 	var pushErrors string
 
+	prexistingUsers := map[string]bool{}
+	members, err := h.client.GetGroupMembers(id)
+	if err != nil {
+		return scim.Resource{}, scimerrors.ScimError{Status: http.StatusNotImplemented, Detail: "Could not fetch memberships"}
+	}
+
+	if members != nil {
+		for _, user := range members.Members {
+			prexistingUsers[user.Id] = true
+		}
+	}
+
 	// members are guaranteed to be multivalued
 	for _, op := range operations {
 		for _, singleVal := range casting.MultiValue[map[string]interface{}](op.Value) {
 			value := casting.SingleValue[string](singleVal["value"])
+
 			switch op.Op {
 			case scim.PatchOperationAdd:
+				if _, ok := prexistingUsers[value]; ok {
+					slog.Info("User is part of the group. Skipping operation", "operation", "add", "group", id, "user", value, "error", err)
+					continue
+				}
+
 				if err := h.client.AddUserToGroup(value, id); err != nil {
 					pushErrors += err.Error() + "\n"
 					slog.Warn("Error adding user from group", "user", value, "error", err)
 				}
 			case scim.PatchOperationRemove:
+				if _, ok := prexistingUsers[value]; !ok {
+					slog.Info("User is part of the group. Skipping operation", "operation", "add", "group", id, "user", value, "error", err)
+					continue
+				}
+
 				if err := h.client.RemoveUserFromGroup(value, id); err != nil {
 					pushErrors += err.Error() + "\n"
 					slog.Warn("Error removing user from group", "user", value, "error", err)
