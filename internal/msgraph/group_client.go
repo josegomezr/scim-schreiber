@@ -135,8 +135,19 @@ func (c *Client) UpdateGroup(uuid string, group Group) (*Group, error) {
 	return c.GetGroup(uuid)
 }
 
-// TODO(josegomezr): skip adding if the requested user exists in the members
+var UserAlreadyExistsInGroup error = errors.New("User is part of this group.")
 func (c *Client) AddUserToGroup(userUuid string, groupUuid string) error {
+	memResp, err := c.GetGroupMembers(groupUuid)
+	if err != nil {
+		return nil
+	}
+
+	for _, member := range memResp.Members {
+		if userUuid == member.Id {
+			return UserAlreadyExistsInGroup
+		}
+	}
+
 	newu := c.config.baseURL.JoinPath("/groups/", groupUuid, "/members/$ref")
 
 	payload := BindRequest{
@@ -168,8 +179,24 @@ func (c *Client) AddUserToGroup(userUuid string, groupUuid string) error {
 	return nil
 }
 
-// TODO(josegomezr): skip removing if the requested user exists in the members
 func (c *Client) RemoveUserFromGroup(userUuid string, groupUuid string) error {
+	memResp, err := c.GetGroupMembers(groupUuid)
+	if err != nil {
+		return nil
+	}
+
+	found := false
+
+	for _, member := range memResp.Members {
+		if userUuid == member.Id {
+			found = true
+		}
+	}
+
+	if !found {
+		return nil
+	}
+
 	newu := c.config.baseURL.JoinPath("/groups/", groupUuid, "/members/", userUuid, "$ref")
 
 	resp, err := c.newRequestRoundTrip("DELETE", newu.String(), nil)
