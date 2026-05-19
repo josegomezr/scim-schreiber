@@ -21,39 +21,10 @@ import (
 )
 
 type UserHandler struct {
-	cfg           *Config
-	adminClient   *admin.Service
-	licenseClient *licensing.Service
-}
-
-type Product struct {
-	ProductId string
-	SkuId     string
-}
-
-// https://developers.google.com/workspace/admin/licensing/v1/how-tos/products
-var Products = map[string]Product{
-	"Google Workspace Enterprise Standard": {
-		ProductId: "Google-Apps",
-		SkuId:     "1010020026",
-	},
-}
-
-var ReverseProductMap = reverseProductMap(Products)
-
-func reverseProductMap(productMap map[string]Product) map[string]map[string]string {
-	m := make(map[string]map[string]string)
-
-	for skuName, product := range productMap {
-		productId := product.ProductId
-		skuId := product.SkuId
-		if m[productId] == nil {
-			m[productId] = make(map[string]string)
-		}
-		m[productId][skuId] = skuName
-	}
-
-	return m
+	cfg                *Config
+	adminClient        *admin.Service
+	licenseClient      *licensing.Service
+	productInformation *ProductInformation
 }
 
 func (h UserHandler) Create(_ *http.Request, attributes scim.ResourceAttributes) (scim.Resource, error) {
@@ -124,7 +95,7 @@ func (h UserHandler) Get(_ *http.Request, id string) (scim.Resource, error) {
 		return scim.Resource{}, err
 	}
 
-	resource.Attributes["entitlements"] = licenseToResource(licensesForUser)
+	resource.Attributes["entitlements"] = h.licenseToResource(licensesForUser)
 
 	return resource, nil
 }
@@ -132,7 +103,7 @@ func (h UserHandler) Get(_ *http.Request, id string) (scim.Resource, error) {
 func (h UserHandler) getLicenses(user *admin.User) ([]Product, error) {
 	licensesForUser := make([]Product, 0)
 
-	for _, product := range Products {
+	for _, product := range h.productInformation.Products {
 		_, err := h.licenseClient.LicenseAssignments.Get(product.ProductId, product.SkuId, user.PrimaryEmail).Do()
 
 		if err != nil {
@@ -149,11 +120,11 @@ func (h UserHandler) getLicenses(user *admin.User) ([]Product, error) {
 	return licensesForUser, nil
 }
 
-func licenseToResource(licenses []Product) []map[string]interface{} {
+func (h UserHandler) licenseToResource(licenses []Product) []map[string]interface{} {
 	out := make([]map[string]interface{}, 0, len(licenses))
 	for _, assignment := range licenses {
 		out = append(out, map[string]interface{}{
-			"value": ReverseProductMap[assignment.ProductId][assignment.SkuId],
+			"value": h.productInformation.ReverseProductMap[assignment.ProductId][assignment.SkuId],
 			"type":  "license",
 		})
 	}
@@ -236,6 +207,7 @@ func resourceToUser(resourceAttrs map[string]interface{}) (*admin.User, error) {
 	}
 
 	return &admin.User{
+		// Only update primary e-mails. Legacy aliases are managed in Google Workspace
 		PrimaryEmail: userName,
 		Name: &admin.UserName{
 			DisplayName: casting.SingleValue[string](resourceAttrs["displayName"]),
@@ -326,11 +298,13 @@ func (h UserHandler) updateUser(attributes scim.ResourceAttributes, id string) (
 
 	user, err := h.adminClient.Users.Update(id, userRequest).Do()
 	if err != nil {
+		slog.Warn("Error updating user", "id", id, "err", err)
 		return scim.Resource{}, scimerrors.ScimError{Status: http.StatusInternalServerError, Detail: fmt.Sprintf("%s", err)}
 	}
 
 	wantLicenses, err := h.updateLicenses(user, attributes)
 	if err != nil {
+		slog.Warn("Error updating licenses", "id", id, "err", err)
 		return scim.Resource{}, err
 	}
 
@@ -356,7 +330,7 @@ func (h UserHandler) updateLicenses(user *admin.User, attributes scim.ResourceAt
 				for _, element := range tmpCast {
 					if license, ok := element.(map[string]interface{}); ok {
 						if license["type"] == "license" {
-							wantLicenses = append(wantLicenses, Products[license["value"].(string)])
+							wantLicenses = append(wantLicenses, h.productInformation.Products[license["value"].(string)])
 						}
 					}
 				}
@@ -400,5 +374,5 @@ ADD:
 			return nil, scimerrors.ScimError{Status: http.StatusInternalServerError, Detail: fmt.Sprintf("%s", err)}
 		}
 	}
-	return licenseToResource(wantLicenses), nil
+	return h.licenseToResource(wantLicenses), nil
 }

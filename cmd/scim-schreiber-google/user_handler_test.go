@@ -53,7 +53,7 @@ func (suite *SCIMUserTestSuite) SetupSuite() {
 	license, err := createLicenseClientWithoutCredentials()
 	require.NoError(suite.T(), err)
 
-	server, err := createSCIMServer(cfg, client, license)
+	server, err := createSCIMServer(cfg, client, license, NewProductInformationFromFile("testdata/products.yaml"))
 	require.NoError(suite.T(), err)
 
 	suite.server = server
@@ -64,14 +64,14 @@ func (suite *SCIMUserTestSuite) TestCreateUser() {
 
 	defer gock.Off()
 
-	requestBody, err := os.Open(filepath.Join(".", "testdata", "create-user.json"))
+	requestBody, err := os.Open(filepath.Join(".", "testdata", "requests", "users", "create-user.json"))
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		require.NoError(t, requestBody.Close())
 	})
 
-	mockToken(t)
-	mock(t, "https://admin.googleapis.com/admin/directory/v1/users", 201, "create-user-response.json")
+	suite.mockToken(t)
+	suite.mock(t, "https://admin.googleapis.com/admin/directory/v1/users", 201, "create-user-response.json")
 	gock.New("https://licensing.googleapis.com").Get("/apps/licensing/v1/product/Google-Apps/sku/1010020026/user/testuser@dev.suse.com").Reply(404)
 	gock.New("https://licensing.googleapis.com").Post("/apps/licensing/v1/product/Google-Apps/sku/1010020026/user/testuser@dev.suse.com").Reply(http.StatusNoContent)
 
@@ -86,16 +86,16 @@ func (suite *SCIMUserTestSuite) TestCreateUser() {
 func (suite *SCIMUserTestSuite) TestReplaceUser() {
 	t := suite.T()
 
-	file, err := os.Open(filepath.Join(".", "testdata", "replace-user.json"))
+	file, err := os.Open(filepath.Join(".", "testdata", "requests", "users", "replace-user.json"))
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		require.NoError(t, file.Close())
 	})
 
 	defer gock.Off()
-	mockToken(t)
-	mock(t, "https://admin.googleapis.com/admin/directory/v1/users/testuser@dev.suse.com", 200, "replace-user-response.json")
-	mockOk(t, "https://licensing.googleapis.com/apps/licensing/v1/product/Google-Apps/sku/1010020026/user/testuser@dev.suse.com", "get_license.json")
+	suite.mockToken(t)
+	suite.mock(t, "https://admin.googleapis.com/admin/directory/v1/users/testuser@dev.suse.com", 200, "replace-user-response.json")
+	suite.mockOk(t, "https://licensing.googleapis.com/apps/licensing/v1/product/Google-Apps/sku/1010020026/user/testuser@dev.suse.com", "get_license.json")
 
 	gock.New("https://licensing.googleapis.com").Delete("/apps/licensing/v1/product/Google-Apps/sku/1010020026/user/testuser@dev.suse.com").Reply(http.StatusNoContent)
 
@@ -139,16 +139,16 @@ func (suite *SCIMUserTestSuite) TestReplaceUser() {
 func (suite *SCIMUserTestSuite) TestPatchUser() {
 	t := suite.T()
 
-	file, err := os.Open(filepath.Join(".", "testdata", "user_change.json"))
+	file, err := os.Open(filepath.Join(".", "testdata", "requests", "users", "user_change.json"))
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		require.NoError(t, file.Close())
 	})
 
 	defer gock.Off()
-	mockToken(t)
-	mock(t, "https://admin.googleapis.com/admin/directory/v1/users/"+testUserUUID, 200, "replace-user-response.json")
-	mockOk(t, "https://licensing.googleapis.com/apps/licensing/v1/product/Google-Apps/sku/1010020026/user/testuser@dev.suse.com", "get_license.json")
+	suite.mockToken(t)
+	suite.mock(t, "https://admin.googleapis.com/admin/directory/v1/users/"+testUserUUID, 200, "replace-user-response.json")
+	suite.mockOk(t, "https://licensing.googleapis.com/apps/licensing/v1/product/Google-Apps/sku/1010020026/user/testuser@dev.suse.com", "get_license.json")
 
 	gock.New("https://licensing.googleapis.com").Delete("/apps/licensing/v1/product/Google-Apps/sku/1010020026/user/testuser@dev.suse.com").Reply(http.StatusNoContent)
 
@@ -199,7 +199,7 @@ func (suite *SCIMUserTestSuite) TestDeleteUser() {
 
 	defer gock.Off()
 
-	mockToken(t)
+	suite.mockToken(t)
 	gock.New("https://admin.googleapis.com/admin/directory/v1/users/" + testUserUUID).Reply(http.StatusNoContent)
 
 	request, _ := http.NewRequest(http.MethodDelete, "/Users/"+testUserUUID, nil)
@@ -213,8 +213,8 @@ func (suite *SCIMUserTestSuite) TestDeleteUser() {
 func (suite *SCIMUserTestSuite) TestMissing() {
 	t := suite.T()
 
-	mockToken(t)
-	mock(t, "https://admin.googleapis.com/admin/directory/v1/users/notAValidUUID", 404, "user_not_found.json")
+	suite.mockToken(t)
+	suite.mock(t, "https://admin.googleapis.com/admin/directory/v1/users/notAValidUUID", 404, "user_not_found.json")
 
 	request, _ := http.NewRequest(http.MethodGet, "/Users/notAValidUUID", nil)
 	response := httptest.NewRecorder()
@@ -236,9 +236,9 @@ func (suite *SCIMUserTestSuite) TestMissing() {
 func (suite *SCIMUserTestSuite) TestGetUser() {
 	t := suite.T()
 
-	mockToken(t)
-	mockOk(t, "https://admin.googleapis.com/admin/directory/v1/users/104965396198408263080", "get_user.json")
-	mockOk(t, "https://licensing.googleapis.com/apps/licensing/v1/product/Google-Apps/sku/1010020026/user/felix-test@dev.suse.com", "get_license.json")
+	suite.mockToken(t)
+	suite.mockOk(t, "https://admin.googleapis.com/admin/directory/v1/users/104965396198408263080", "get_user.json")
+	suite.mockOk(t, "https://licensing.googleapis.com/apps/licensing/v1/product/Google-Apps/sku/1010020026/user/felix-test@dev.suse.com", "get_license.json")
 
 	request, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("/Users/%s", testUserUUID), nil)
 	response := httptest.NewRecorder()
@@ -276,12 +276,12 @@ func (suite *SCIMUserTestSuite) TestGetUser() {
 	assert.Equal(t, http.StatusOK, response.Code)
 }
 
-func mockOk(t *testing.T, url string, responseFile string) {
-	mock(t, url, 200, responseFile)
+func (suite *SCIMUserTestSuite) mockOk(t *testing.T, url string, responseFile string) {
+	suite.mock(t, url, 200, responseFile)
 }
 
-func mock(t *testing.T, url string, status int, responseFile string) {
-	file, err := os.Open(filepath.Join(".", "testdata", responseFile))
+func (suite *SCIMUserTestSuite) mock(t *testing.T, url string, status int, responseFile string) {
+	file, err := os.Open(filepath.Join(".", "testdata", "stubs", "users", responseFile))
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		require.NoError(t, file.Close())
@@ -290,16 +290,16 @@ func mock(t *testing.T, url string, status int, responseFile string) {
 	gock.New(url).Reply(status).Body(file)
 }
 
-func mockToken(t *testing.T) {
-	mockOk(t, "https://oauth2.googleapis.com/token", "token.json")
+func (suite *SCIMUserTestSuite) mockToken(t *testing.T) {
+	suite.mockOk(t, "https://oauth2.googleapis.com/token", "token.json")
 }
 
 func (suite *SCIMUserTestSuite) TestGetAllUsers() {
 	t := suite.T()
 
 	defer gock.Off()
-	mockToken(t)
-	mockOk(t, "https://admin.googleapis.com/admin/directory/v1/users", "all_users.json")
+	suite.mockToken(t)
+	suite.mockOk(t, "https://admin.googleapis.com/admin/directory/v1/users", "all_users.json")
 
 	request, _ := http.NewRequest(http.MethodGet, "/Users", nil)
 	response := httptest.NewRecorder()
@@ -367,8 +367,8 @@ func (suite *SCIMUserTestSuite) TestFilterUsers() {
 	t := suite.T()
 
 	defer gock.Off()
-	mockToken(t)
-	mockOk(t, "https://admin.googleapis.com/admin/directory/v1/users?alt=json&domain=dev.suse.com&prettyPrint=false&query=email%3Dfelix-test%40dev.suse.com", "filter_response.json")
+	suite.mockToken(t)
+	suite.mockOk(t, "https://admin.googleapis.com/admin/directory/v1/users?alt=json&domain=dev.suse.com&prettyPrint=false&query=email%3Dfelix-test%40dev.suse.com", "filter_response.json")
 
 	request, _ := http.NewRequest(http.MethodGet, "/Users?filter="+url.QueryEscape("userName eq \"felix-test@dev.suse.com\""), nil)
 	response := httptest.NewRecorder()

@@ -1,0 +1,36 @@
+{
+  "Resources": [
+    {
+      "displayName": "abuse",
+      "externalId": "04iylrwe1ryosyl",
+      "id": "04iylrwe1ryosyl",
+      "email":"abuse@dev.suse.com",
+      "meta": {
+        "location": "Groups/04iylrwe1ryosyl",
+        "resourceType": "Group"
+      },
+      "schemas": [
+        "urn:ietf:params:model:schemas:core:2.0:Group"
+      ]
+    },
+    {
+      "displayName": "postmaster",
+      "externalId": "00tyjcwt2wgxqro",
+      "id": "00tyjcwt2wgxqro",
+      "email":"postmaster@dev.suse.com",
+      "meta": {
+        "location": "Groups/00tyjcwt2wgxqro",
+        "resourceType": "Group"
+      },
+      "schemas": [
+        "urn:ietf:params:model:schemas:core:2.0:Group"
+      ]
+    }
+  ],
+  "itemsPerPage": 100,
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:ListResponse"
+  ],
+  "startIndex": 1,
+  "totalResults": 2
+}

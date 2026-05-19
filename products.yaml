@@ -1,0 +1,5 @@
+# https://developers.google.com/workspace/admin/licensing/v1/how-tos/products
+products:
+  Google Workspace Enterprise Standard:
+    productId: "Google-Apps"
+    skuId: "1010020026"

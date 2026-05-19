@@ -14,4 +14,7 @@ RUN go build ./cmd/scim-schreiber-google/
 FROM registry.suse.com/bci/bci-minimal
 
 COPY --from=builder /build/scim-schreiber-google /scim-schreiber-google
+# Copy default products configuration
+COPY products.yaml .
+
 CMD ["/scim-schreiber-google"]

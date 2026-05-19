@@ -1,0 +1,23 @@
+{
+  "Resources": [
+    {
+      "displayName": "Test Group",
+      "externalId": "04iylrwe1ryosyl",
+      "id": "04iylrwe1ryosyl",
+      "email":"abuse@dev.suse.com",
+      "meta": {
+        "resourceType": "Group",
+        "location": "Groups/04iylrwe1ryosyl"
+      },
+      "schemas": [
+        "urn:ietf:params:model:schemas:core:2.0:Group"
+      ]
+    }
+  ],
+  "itemsPerPage": 100,
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:ListResponse"
+  ],
+  "startIndex": 1,
+  "totalResults": 1
+}

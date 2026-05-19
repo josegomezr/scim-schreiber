@@ -20,9 +20,26 @@ import (
 	"github.com/josegomezr/scim-schreiber-ldap/cmd/scim-schreiber-ldap/testhelpers"
 )
 
+import _ "embed"
+
 const (
 	testGroupId = "testGroupId"
 )
+
+//go:embed testdata/expectations/groups/replace-group-response.json
+var replaceGroupResponse string
+
+//go:embed testdata/expectations/groups/get-group.json
+var getGroupResponse string
+
+//go:embed testdata/expectations/groups/group-list.json
+var groupListResponse string
+
+//go:embed testdata/expectations/groups/filter-response.json
+var filterResponse string
+
+//go:embed testdata/stubs/groups/filter.json
+var groupFilterStub string
 
 type SCIMGroupTestSuite struct {
 	suite.Suite
@@ -44,7 +61,7 @@ func (suite *SCIMGroupTestSuite) SetupSuite() {
 	license, err := createLicenseClientWithoutCredentials()
 	require.NoError(suite.T(), err)
 
-	server, err := createSCIMServer(cfg, client, license)
+	server, err := createSCIMServer(cfg, client, license, nil)
 	require.NoError(suite.T(), err)
 
 	suite.server = server
@@ -53,7 +70,7 @@ func (suite *SCIMGroupTestSuite) SetupSuite() {
 func (suite *SCIMGroupTestSuite) TestCreateGroup() {
 	t := suite.T()
 
-	file, err := os.Open(filepath.Join(".", "testdata", "create-group.json"))
+	file, err := os.Open(filepath.Join(".", "testdata", "requests", "groups", "create-group.json"))
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		require.NoError(t, file.Close())
@@ -87,7 +104,7 @@ func (suite *SCIMGroupTestSuite) TestDeleteGroup() {
 func (suite *SCIMGroupTestSuite) TestReplaceGroup() {
 	t := suite.T()
 
-	file, err := os.Open(filepath.Join(".", "testdata", "replace-group.json"))
+	file, err := os.Open(filepath.Join(".", "testdata", "requests", "groups", "replace-group.json"))
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		require.NoError(t, file.Close())
@@ -106,28 +123,13 @@ func (suite *SCIMGroupTestSuite) TestReplaceGroup() {
 
 	assert.Equal(t, http.StatusOK, response.Code)
 	got := response.Body.String()
-
-	assert.JSONEq(t, `
-		{
-		  "displayName": "Replaced Group",
-		  "externalId": "1",
-		  "email": "google-workspace-staging@dev.suse.com",	
-		  "id": "1",
-		  "meta": {
-			"location": "Groups/1",
-			"resourceType": "Group"
-		  },
-		  "schemas": [
-			"urn:ietf:params:model:schemas:core:2.0:Group"
-		  ]
-		}
-	`, got)
+	assert.JSONEq(t, replaceGroupResponse, got)
 }
 
 func (suite *SCIMGroupTestSuite) TestReplaceGroupWithPatch() {
 	t := suite.T()
 
-	file, err := os.Open(filepath.Join(".", "testdata", "patch_group.json"))
+	file, err := os.Open(filepath.Join(".", "testdata", "requests", "groups", "patch_group.json"))
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		require.NoError(t, file.Close())
@@ -219,23 +221,8 @@ func (suite *SCIMGroupTestSuite) TestGetGroup() {
 	suite.server.ServeHTTP(response, request)
 
 	got := response.Body.String()
-	want := `
-		{
-		  "displayName": "Replaced Group",
-		  "externalId": "1",
-		  "id": "1",
-          "email": "google-workspace-staging@dev.suse.com",
-		  "meta": {
-			"location": "Groups/1",
-			"resourceType": "Group"
-		  },
-		  "schemas": [
-			"urn:ietf:params:model:schemas:core:2.0:Group"
-		  ]
-		}
-    `
 
-	assert.JSONEq(t, want, got)
+	assert.JSONEq(t, getGroupResponse, got)
 	assert.Equal(t, http.StatusOK, response.Code)
 }
 
@@ -244,7 +231,7 @@ func (suite *SCIMGroupTestSuite) TestList() {
 
 	defer gock.Off()
 	gock.Observe(gock.DumpRequest)
-	mockOk(t, "https://admin.googleapis.com/admin/directory/v1/groups", "list_groups.json")
+	suite.mockOk(t, "https://admin.googleapis.com/admin/directory/v1/groups", "list_groups.json")
 
 	request, _ := http.NewRequest(http.MethodGet, "/Groups", nil)
 
@@ -252,44 +239,7 @@ func (suite *SCIMGroupTestSuite) TestList() {
 	suite.server.ServeHTTP(response, request)
 
 	got := response.Body.String()
-	want := `
-			{
-			  "Resources": [
-				{
-				  "displayName": "abuse",
-				  "externalId": "04iylrwe1ryosyl",
-				  "id": "04iylrwe1ryosyl",
-                  "email":"abuse@dev.suse.com",
-				  "meta": {
-					"location": "Groups/04iylrwe1ryosyl",
-					"resourceType": "Group"
-				  },
-				  "schemas": [
-					"urn:ietf:params:model:schemas:core:2.0:Group"
-				  ]
-				},
-				{
-				  "displayName": "postmaster",
-				  "externalId": "00tyjcwt2wgxqro",
-				  "id": "00tyjcwt2wgxqro",
-                  "email":"postmaster@dev.suse.com",
-				  "meta": {
-					"location": "Groups/00tyjcwt2wgxqro",
-					"resourceType": "Group"
-				  },
-				  "schemas": [
-					"urn:ietf:params:model:schemas:core:2.0:Group"
-				  ]
-				}
-			  ],
-			  "itemsPerPage": 100,
-			  "schemas": [
-				"urn:ietf:params:scim:api:messages:2.0:ListResponse"
-			  ],
-			  "startIndex": 1,
-			  "totalResults": 2
-			}
-    `
+	want := groupListResponse
 	assert.JSONEq(t, want, got)
 	assert.Equal(t, http.StatusOK, response.Code)
 }
@@ -299,27 +249,7 @@ func (suite *SCIMGroupTestSuite) TestFilter() {
 
 	defer gock.Off()
 	gock.Observe(gock.DumpRequest)
-	gock.New("https://admin.googleapis.com/admin/directory/v1/groups").MatchParam("query", "name='Test Group'").Reply(200).Body(strings.NewReader(`
-			{
-			  "kind": "admin#directory#groups",
-			  "etag": "\"DcQ1N-bWFowTUUTzr_P6Kb_8lgiFBgpcxrHgSbp-VdA/DFKY_t69AnNE0fzrAxtib7CJVDg\"",
-			  "groups": [
-				{
-				  "kind": "admin#directory#group",
-				  "id": "04iylrwe1ryosyl",
-				  "etag": "\"DcQ1N-bWFowTUUTzr_P6Kb_8lgiFBgpcxrHgSbp-VdA/2M_ysMr-t4PMM2aF3Byt-m7kVZU\"",
-				  "email": "abuse@dev.suse.com",
-				  "name": "Test Group",
-				  "directMembersCount": "0",
-				  "description": "",
-				  "adminCreated": true,
-				  "nonEditableAliases": [
-					"abuse@dev.suse.com.test-google-a.com"
-				  ]
-				}
-			  ]
-			}
-	`))
+	gock.New("https://admin.googleapis.com/admin/directory/v1/groups").MatchParam("query", "name='Test Group'").Reply(200).Body(strings.NewReader(groupFilterStub))
 
 	request, _ := http.NewRequest(http.MethodGet, "/Groups?filter="+url.QueryEscape("displayName eq \"Test Group\""), nil)
 
@@ -327,36 +257,29 @@ func (suite *SCIMGroupTestSuite) TestFilter() {
 	suite.server.ServeHTTP(response, request)
 
 	got := response.Body.String()
-	want := `
-		{
-		  "Resources": [
-			{
-			  "displayName": "Test Group",
-			  "externalId": "04iylrwe1ryosyl",
-			  "id": "04iylrwe1ryosyl",
-              "email":"abuse@dev.suse.com", 
-			  "meta": {
-				"resourceType": "Group",
-				"location": "Groups/04iylrwe1ryosyl"
-			  },
-			  "schemas": [
-				"urn:ietf:params:model:schemas:core:2.0:Group"
-			  ]
-			}
-		  ],
-		  "itemsPerPage": 100,
-		  "schemas": [
-			"urn:ietf:params:scim:api:messages:2.0:ListResponse"
-		  ],
-		  "startIndex": 1,
-		  "totalResults": 1
-		}
-    `
 
-	assert.JSONEq(t, want, got)
+	assert.JSONEq(t, filterResponse, got)
 	assert.Equal(t, http.StatusOK, response.Code)
 }
 
 func TestSCIMGroupTestSuite(t *testing.T) {
 	suite.Run(t, new(SCIMGroupTestSuite))
+}
+
+func (suite *SCIMGroupTestSuite) mockOk(t *testing.T, url string, responseFile string) {
+	suite.mock(t, url, 200, responseFile)
+}
+
+func (suite *SCIMGroupTestSuite) mock(t *testing.T, url string, status int, responseFile string) {
+	file, err := os.Open(filepath.Join(".", "testdata", "stubs", "groups", responseFile))
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, file.Close())
+	})
+
+	gock.New(url).Reply(status).Body(file)
+}
+
+func (suite *SCIMGroupTestSuite) mockToken(t *testing.T) {
+	suite.mockOk(t, "https://oauth2.googleapis.com/token", "token.json")
 }

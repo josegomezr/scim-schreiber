@@ -52,7 +52,7 @@ func main() {
 		return
 	}
 
-	server, err := createSCIMServer(cfg, adminClient, licenseClient)
+	server, err := createSCIMServer(cfg, adminClient, licenseClient, NewProductInformationFromFile("products.yaml"))
 
 	if err != nil {
 		slog.Error("Failed to create server", "err", err)
@@ -154,7 +154,7 @@ func createLicenseClient(ctx context.Context, opts ...option.ClientOption) (*lic
 	return srv, nil
 }
 
-func createSCIMServer(cfg Config, adminClient *admin.Service, licenseClient *licensing.Service) (scim.Server, error) {
+func createSCIMServer(cfg Config, adminClient *admin.Service, licenseClient *licensing.Service, products *ProductInformation) (scim.Server, error) {
 	config := scim.ServiceProviderConfig{
 		AuthenticationSchemes: []scim.AuthenticationScheme{
 			{
@@ -178,9 +178,10 @@ func createSCIMServer(cfg Config, adminClient *admin.Service, licenseClient *lic
 			Description: optional.NewString("User Account"),
 			Schema:      UserSchema,
 			Handler: UserHandler{
-				cfg:           &cfg,
-				adminClient:   adminClient,
-				licenseClient: licenseClient,
+				cfg:                &cfg,
+				adminClient:        adminClient,
+				licenseClient:      licenseClient,
+				productInformation: products,
 			},
 		},
 		{
