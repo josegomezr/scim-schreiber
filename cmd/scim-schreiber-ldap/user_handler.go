@@ -182,10 +182,16 @@ func (h UserHandler) GetAll(r *http.Request, params scim.ListRequestParams) (sci
 }
 
 func (h UserHandler) Patch(r *http.Request, id string, operations []scim.PatchOperation) (scim.Resource, error) {
-	return scim.Resource{}, errors.ScimError{Status: http.StatusNotImplemented, Detail: "Patch is not implemented for users"}
-}
 
-func (h UserHandler) Replace(r *http.Request, id string, attributes scim.ResourceAttributes) (scim.Resource, error) {
+	if len(operations) != 1 {
+		return scim.Resource{}, errors.ScimErrorBadRequest("Must be exactly one operation")
+	}
+
+	operation := operations[0]
+	if operation.Op != scim.PatchOperationReplace || operation.Path != nil {
+		return scim.Resource{}, errors.ScimErrorBadRequest("Must be replace operation at root")
+	}
+
 	ldapCtx, ok := GetLDAPContext(r.Context())
 
 	if !ok {
@@ -202,15 +208,17 @@ func (h UserHandler) Replace(r *http.Request, id string, attributes scim.Resourc
 
 	slog.Info("Found user", "entry", entry)
 
-	// TODO(josegomezr): change more details
+	attributes := operation.Value.(map[string]interface{})
+
 	slog.Info("Updating user details.", "from", entry.GetAttributeValue("cn"), "to", attributes["displayName"])
 
-	s := scimMailToLdap(attributes)
+	// TODO Should mail updates even be allowed?
+	//s := scimMailToLdap(attributes)
 
 	replaces := map[string][]string{
 		"cn":           {attributes["displayName"].(string)},
-		"sshPublicKey": getOptionalAttribute(attributes, "sshPublicKey", []string{}),
-		"mail":         s,
+		"sshPublicKey": getOptionalAttributeSlice(attributes, "sshPublicKey", []string{}),
+		//"mail": s,
 	}
 
 	err := ldapCtx.UpdateEntry(entry.DN, nil, nil, replaces)
@@ -224,6 +232,10 @@ func (h UserHandler) Replace(r *http.Request, id string, attributes scim.Resourc
 	entry = ldapCtx.searchUserByUUID(id)
 	// return resource with replaced attributes
 	return ldapEntryToUserResource(entry), nil
+}
+
+func (h UserHandler) Replace(r *http.Request, id string, attributes scim.ResourceAttributes) (scim.Resource, error) {
+	return scim.Resource{}, errors.ScimError{Status: http.StatusNotImplemented, Detail: "replace is not implemented for users"}
 }
 
 func scimMailToLdap(attributes scim.ResourceAttributes) []string {
@@ -250,6 +262,24 @@ func scimMailToLdap(attributes scim.ResourceAttributes) []string {
 
 	if primary != "" {
 		result = slices.Insert(result, 0, primary)
+	}
+
+	return result
+}
+
+func getOptionalAttributeSlice[T any](attributes scim.ResourceAttributes, name string, fallback []T) []T {
+	value, ok := attributes[name]
+
+	if !ok {
+		return fallback
+	}
+
+	list := value.([]interface{})
+
+	result := make([]T, 0, len(list))
+
+	for _, entry := range list {
+		result = append(result, entry.(T))
 	}
 
 	return result
