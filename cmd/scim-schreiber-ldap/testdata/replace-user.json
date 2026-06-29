@@ -4,8 +4,30 @@
     "familyName": "Replace",
     "formatted":"User Replace"
   },
-  "displayName": "User Replace",
-  "active": true,
+  "active": false,
+  "title": "Test Engineer",
+  "organization": "SUSE",
+  "sshPublicKey": ["test-ssh-key"],
+  "externalId": "uid=test,ou=people,dc=suse,dc=com",
+  "addresses": [
+    {
+      "streetAddress": "Streetname 1",
+      "locality": "City",
+      "postalCode": "123456",
+      "region": "Bavaria",
+      "country": "DE"
+    }
+  ],
+  "phoneNumbers": [
+    {
+      "type": "mobile",
+      "value": "+1 234"
+    },
+    {
+      "type": "work",
+      "value": "+1 456"
+    }
+  ],
   "emails": [
     {
       "primary": false,

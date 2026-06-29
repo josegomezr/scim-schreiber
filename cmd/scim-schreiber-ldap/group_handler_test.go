@@ -15,10 +15,12 @@ import (
 
 	"github.com/elimity-com/scim"
 	"github.com/go-ldap/ldap/v3"
-	"github.com/josegomezr/scim-schreiber-ldap/cmd/scim-schreiber-ldap/testhelpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/josegomezr/scim-schreiber-ldap/cmd/scim-schreiber-ldap/testhelpers"
+	"github.com/josegomezr/scim-schreiber-ldap/internal/uuidgenerator"
 )
 
 const (
@@ -48,7 +50,7 @@ func (suite *SCIMGroupTestSuite) SetupSuite() {
 		GroupCreationIsUpsert: true,
 	}
 
-	server, err := createSCIMServer(cfg)
+	server, err := createSCIMServer(cfg, uuidgenerator.UUIDGeneratorMock{})
 	require.NoError(suite.T(), err)
 
 	suite.server = server
@@ -79,7 +81,7 @@ func (suite *SCIMGroupTestSuite) BeforeTest(suiteName, testName string) {
 	_, err := suite.ldapCtx.CreateGroup(testGroupId, "Test Group", 1000)
 	assert.NoError(suite.T(), err)
 
-	_, err = suite.ldapCtx.CreateUser("test", "changeme", testUserUUID)
+	_, err = suite.ldapCtx.CreateTestUser("test", "changeme", testUserUUID)
 	assert.NoError(suite.T(), err)
 }
 
@@ -171,7 +173,7 @@ func (suite *SCIMGroupTestSuite) TestPatch() {
 					   "op":"replace",
 					   "value":
 						{
-						  "displayName": "Patched Groupname"
+						  "displayName": "group-fullReplace"
 						}
 					 }
 				  ]
@@ -180,7 +182,7 @@ func (suite *SCIMGroupTestSuite) TestPatch() {
 			status: http.StatusOK,
 			response: `
 				{
-				  "displayName" : "Patched Groupname",
+				  "displayName" : "group-fullReplace",
 				  "externalId" : "cn=group-fullReplace,ou=groups,dc=suse,dc=com",
 				  "id" : "group-fullReplace",
 				  "members" : [ ],
@@ -192,6 +194,7 @@ func (suite *SCIMGroupTestSuite) TestPatch() {
 				}
 			`,
 		},
+		// TODO These tests make no sense since we don't allow updating the display name (it would be a cn move)
 		"pathReplace": {
 			request: `
 				{
@@ -210,7 +213,7 @@ func (suite *SCIMGroupTestSuite) TestPatch() {
 			status: http.StatusOK,
 			response: `
 				{
-				  "displayName" : "Patched Path Group",
+				  "displayName" : "group-pathReplace",
 				  "externalId" : "cn=group-pathReplace,ou=groups,dc=suse,dc=com",
 				  "id" : "group-pathReplace",
 				  "members" : [ ],
@@ -223,7 +226,7 @@ func (suite *SCIMGroupTestSuite) TestPatch() {
 			`,
 		},
 		"addMember": {
-			request: fmt.Sprintf(`
+			request: `
 		  		{
 		  		  "schemas": [
 		  			"urn:ietf:params:scim:api:messages:2.0:PatchOp"
@@ -235,18 +238,18 @@ func (suite *SCIMGroupTestSuite) TestPatch() {
 		  			   "members": [
 		  				   {
 		  						"display": "alex",
-		  						"value": "%s"
+		  						"value": "test"
 		  				   }
 		  			     ]
 		  			   }
 		  			 }
 		  		  ]
 		  		}
-		  	`, testUserUUID),
+		  	`,
 			status: http.StatusOK,
 			response: `
 		  		{
-		  		  "displayName" : "PATCH-addMember",
+		  		  "displayName" : "group-addMember",
 		  		  "externalId" : "cn=group-addMember,ou=groups,dc=suse,dc=com",
 		  		  "id" : "group-addMember",
 				  "members": [
@@ -263,23 +266,22 @@ func (suite *SCIMGroupTestSuite) TestPatch() {
 		  	`,
 		},
 		"addMemberPathStyle": {
-			request: fmt.Sprintf(`
+			request: `
 				{
 				  "schemas": [
 					"urn:ietf:params:scim:api:messages:2.0:PatchOp"
 				  ],
 				  "Operations": [
 					 {
-					 	"op": "add", "path": "members", "value": [{"value": "%s"}]
+					 	"op": "add", "path": "members", "value": [{"value": "test"}]
 					 }
 				  ]
 				}
-			`, testUserUUID),
+			`,
 			status: http.StatusOK,
-			// TODO In the request we expect the uuid for the member and in the response we give back the name?
 			response: `
 				{
-				  "displayName": "PATCH-addMemberPathStyle",
+				  "displayName": "group-addMemberPathStyle",
 				  "externalId": "cn=group-addMemberPathStyle,ou=groups,dc=suse,dc=com",
 				  "id": "group-addMemberPathStyle",
 				  "members": [
@@ -355,7 +357,7 @@ func (suite *SCIMGroupTestSuite) TestGetGroup() {
 	got := response.Body.String()
 	want := `
 		{
-		  "displayName": "Test Group",
+		  "displayName": "testGroupId",
 		  "externalId": "cn=testGroupId,ou=groups,dc=suse,dc=com",
 		  "id": "testGroupId",
 		  "members": [],
@@ -388,20 +390,7 @@ func (suite *SCIMGroupTestSuite) TestList() {
 			{
 			  "Resources": [
 				{
-				  "displayName": "",
-				  "externalId": "cn=demo_group,ou=Groups,dc=suse,dc=com",
-				  "id": "demo_group",
-				  "members": [],
-				  "meta": {
-					"resourceType": "Group",
-					"location": "Groups/demo_group"
-				  },
-				  "schemas": [
-					"urn:ietf:params:model:schemas:core:2.0:Group"
-				  ]
-				},
-				{
-				  "displayName": "Test Group",
+				  "displayName": "testGroupId",
 				  "externalId": "cn=testGroupId,ou=groups,dc=suse,dc=com",
 				  "id": "testGroupId",
 				  "members": [],
@@ -419,7 +408,7 @@ func (suite *SCIMGroupTestSuite) TestList() {
 				"urn:ietf:params:scim:api:messages:2.0:ListResponse"
 			  ],
 			  "startIndex": 1,
-			  "totalResults": 3
+			  "totalResults": 2
 			}
     `
 	// TODO totalResults is borked
@@ -444,7 +433,7 @@ func (suite *SCIMGroupTestSuite) TestGetCount() {
        "itemsPerPage":0,
        "schemas": ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
        "startIndex":1,
-       "totalResults":2
+       "totalResults":1
     }
     `
 
@@ -455,7 +444,7 @@ func (suite *SCIMGroupTestSuite) TestGetCount() {
 func (suite *SCIMGroupTestSuite) TestFilter() {
 	t := suite.T()
 
-	request, _ := http.NewRequest(http.MethodGet, "/Groups?filter="+url.QueryEscape("displayName eq \"Test Group\""), nil)
+	request, _ := http.NewRequest(http.MethodGet, "/Groups?filter="+url.QueryEscape("displayName eq \"testGroupId\""), nil)
 	ctx := WithLDAPContext(request.Context(), suite.ldapCtx)
 	request = request.WithContext(ctx)
 
@@ -467,7 +456,7 @@ func (suite *SCIMGroupTestSuite) TestFilter() {
 		{
 		  "Resources": [
 			{
-			  "displayName": "Test Group",
+			  "displayName": "testGroupId",
 			  "externalId": "cn=testGroupId,ou=groups,dc=suse,dc=com",
 			  "id": "testGroupId",
 			  "members": [],

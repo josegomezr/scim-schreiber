@@ -69,12 +69,31 @@ func (l *LdapUtil) DeleteGroup(id string) error {
 	return err
 }
 
-func (l *LdapUtil) CreateUser(username string, password string, uuid string) (string, error) {
+func (l *LdapUtil) CreateUser(dn string, attributes map[string][]string) (string, error) {
+	addReq := ldap.NewAddRequest(dn, []ldap.Control{})
+	addReq.Attribute("objectClass", []string{"inetOrgPerson", "organizationalPerson", "person", "suseuser", "top"})
+
+	for key, value := range attributes {
+		if len(value) > 0 {
+			addReq.Attribute(key, value)
+		}
+	}
+
+	if err := l.conn.Add(addReq); err != nil {
+		log.Fatal("error adding user:", addReq, err)
+		return "", err
+	}
+
+	return dn, nil
+}
+
+func (l *LdapUtil) CreateTestUser(username string, password string, uuid string) (string, error) {
 	dn := fmt.Sprintf("uid=%s,%s,%s", username, l.baseUserOu, l.baseDn)
 
 	addReq := ldap.NewAddRequest(dn, []ldap.Control{})
 	addReq.Attribute("objectClass", []string{"suseuser"})
 	addReq.Attribute("sn", []string{"Surname"})
+	addReq.Attribute("givenName", []string{"First Name"})
 	addReq.Attribute("cn", []string{"Max Mustermann"})
 	addReq.Attribute("uid", []string{username})
 	addReq.Attribute("isActive", []string{"true"})
@@ -98,6 +117,12 @@ func (l *LdapUtil) CreateUser(username string, password string, uuid string) (st
 func (l *LdapUtil) DeleteUser(username string) error {
 	dn := fmt.Sprintf("uid=%s,%s,%s", username, l.baseUserOu, l.baseDn)
 	err := l.conn.Del(ldap.NewDelRequest(dn, []ldap.Control{}))
+
+	if err != nil {
+		if err.(*ldap.Error).ResultCode == ldap.LDAPResultNoSuchObject {
+			return nil
+		}
+	}
 
 	return err
 }
@@ -276,4 +301,31 @@ func (l *LdapUtil) searchUser(uid string) *ldap.Entry {
 
 func (l *LdapUtil) searchUserByUUID(uid string) *ldap.Entry {
 	return l._searchUser(uid, "uuid")
+}
+
+func (l *LdapUtil) searchUserByDN(dn string) *ldap.Entry {
+	searchRequest := ldap.NewSearchRequest(
+		dn,
+		ldap.ScopeBaseObject,
+		ldap.NeverDerefAliases,
+		0,
+		0,
+		false,
+		"(objectClass=*)", // The filter to apply
+		nil,               // A list attributes to retrieve
+		nil,
+	)
+
+	searchResult, err := l.conn.Search(searchRequest)
+
+	if err != nil {
+		slog.Error("Failed to find by dn", "err", err)
+		return nil
+	}
+
+	if len(searchResult.Entries) != 1 {
+		return nil
+	}
+
+	return searchResult.Entries[0]
 }

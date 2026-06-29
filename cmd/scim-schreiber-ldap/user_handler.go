@@ -5,16 +5,20 @@ import (
 	"log/slog"
 	"net/http"
 	"slices"
+	"strconv"
 
 	"github.com/elimity-com/scim"
 	"github.com/elimity-com/scim/errors"
 	"github.com/elimity-com/scim/optional"
 	"github.com/go-ldap/ldap/v3"
 	scim_filter_parser "github.com/scim2/filter-parser/v2"
+
+	"github.com/josegomezr/scim-schreiber-ldap/internal/uuidgenerator"
 )
 
 type UserHandler struct {
-	cfg *Config
+	cfg           *Config
+	uuidGenerator uuidgenerator.UUIDGenerator
 }
 
 func (h UserHandler) Create(r *http.Request, attributes scim.ResourceAttributes) (scim.Resource, error) {
@@ -47,9 +51,21 @@ func (h UserHandler) Create(r *http.Request, attributes scim.ResourceAttributes)
 		}
 	}
 
-	return scim.Resource{}, errors.ScimError{
-		Status: http.StatusNotImplemented,
+	ldapAttributes := h.resourceToLdap(attributes)
+	externalId := attributes["externalId"].(string)
+
+	ldapAttributes["employeeNumber"] = []string{"-1"}
+	ldapAttributes["uuid"] = []string{h.uuidGenerator.NewUUID(externalId)}
+
+	dn, err := ldapCtx.CreateUser(externalId, ldapAttributes)
+
+	if err != nil {
+		slog.Error("Failed to create user", "error", err)
+		return scim.Resource{}, err
 	}
+
+	entry := ldapCtx.searchUserByDN(dn)
+	return ldapEntryToUserResource(entry), nil
 }
 
 // TODO(josegomezr): sometimes IDP's don't really _delete_ things. We gotta find a creative way to
@@ -69,7 +85,7 @@ func (h UserHandler) Delete(r *http.Request, id string) error {
 		}
 	}
 
-	if u := ldapCtx.searchUserByUUID(id); u != nil {
+	if u := ldapCtx.searchUser(id); u != nil {
 		// TODO delete the user
 	}
 
@@ -89,7 +105,7 @@ func (h UserHandler) Get(r *http.Request, id string) (scim.Resource, error) {
 		}
 	}
 
-	entry := ldapCtx.searchUserByUUID(id)
+	entry := ldapCtx.searchUser(id)
 
 	if entry == nil {
 		return scim.Resource{}, errors.ScimErrorResourceNotFound(id)
@@ -201,25 +217,27 @@ func (h UserHandler) Patch(r *http.Request, id string, operations []scim.PatchOp
 		}
 	}
 
-	entry := ldapCtx.searchUserByUUID(id)
+	attributes := operation.Value.(map[string]interface{})
+
+	if attributes["userName"] != id {
+		return scim.Resource{}, errors.ScimErrorBadRequest("Username must match id")
+	}
+
+	entry := ldapCtx.searchUser(id)
 	if entry == nil {
 		return scim.Resource{}, errors.ScimErrorResourceNotFound(id)
 	}
 
-	slog.Info("Found user", "entry", entry)
+	slog.Debug("Found user", "entry", entry)
 
-	attributes := operation.Value.(map[string]interface{})
-
-	slog.Info("Updating user details.", "from", entry.GetAttributeValue("cn"), "to", attributes["displayName"])
-
-	// TODO Should mail updates even be allowed?
-	//s := scimMailToLdap(attributes)
-
-	replaces := map[string][]string{
-		"cn":           {attributes["displayName"].(string)},
-		"sshPublicKey": getOptionalAttributeSlice(attributes, "sshPublicKey", []string{}),
-		//"mail": s,
+	if entry.DN != attributes["externalId"] {
+		slog.Warn("Mismatched DN ", "entryDn", entry.DN, "externalId", attributes["externalId"])
+		return scim.Resource{}, errors.ScimErrorResourceNotFound(id)
 	}
+
+	slog.Info("Updating user details.", "uid", entry.GetAttributeValue("uid"))
+
+	replaces := h.resourceToLdap(attributes)
 
 	err := ldapCtx.UpdateEntry(entry.DN, nil, nil, replaces)
 
@@ -229,9 +247,60 @@ func (h UserHandler) Patch(r *http.Request, id string, operations []scim.PatchOp
 	}
 
 	// Get updated entry
-	entry = ldapCtx.searchUserByUUID(id)
+	entry = ldapCtx.searchUser(id)
 	// return resource with replaced attributes
 	return ldapEntryToUserResource(entry), nil
+}
+
+func (h UserHandler) resourceToLdap(attributes map[string]interface{}) map[string][]string {
+	s := scimMailToLdap(attributes)
+
+	name := attributes["name"].(map[string]interface{})
+
+	address := map[string]interface{}{}
+	if addresses, ok := attributes["addresses"]; ok && len(addresses.([]interface{})) > 0 {
+		address = addresses.([]interface{})[0].(map[string]interface{})
+	}
+
+	replaces := map[string][]string{
+		"isActive":     {strconv.FormatBool(attributes["active"].(bool))},
+		"cn":           {name["formatted"].(string)},
+		"givenName":    {name["givenName"].(string)},
+		"title":        getOptionalAttribute(attributes, "title"),
+		"o":            getOptionalAttribute(attributes, "organization"),
+		"sn":           {name["familyName"].(string)},
+		"sshPublicKey": getOptionalAttributeSlice(attributes, "sshPublicKey", []string{}),
+		"mail":         s,
+		// Address
+		"street":     getOptionalAttribute(address, "streetAddress"),
+		"l":          getOptionalAttribute(address, "locality"),
+		"postalCode": getOptionalAttribute(address, "postalCode"),
+		"c":          getOptionalAttribute(address, "country"),
+		"st":         getOptionalAttribute(address, "region"),
+	}
+
+	if telephones, ok := attributes["phoneNumbers"]; ok {
+		for _, phone := range telephones.([]interface{}) {
+			phoneEntry := phone.(map[string]interface{})
+			phoneNr, ok := phoneEntry["value"].(string)
+			if !ok {
+				continue
+			}
+			phoneType, ok := phoneEntry["type"].(string)
+			if !ok {
+				continue
+			}
+			switch phoneType {
+			case "work":
+				replaces["telephoneNumber"] = []string{phoneNr}
+				break
+			case "mobile":
+				replaces["mobile"] = []string{phoneNr}
+				break
+			}
+		}
+	}
+	return replaces
 }
 
 func (h UserHandler) Replace(r *http.Request, id string, attributes scim.ResourceAttributes) (scim.Resource, error) {
@@ -285,14 +354,14 @@ func getOptionalAttributeSlice[T any](attributes scim.ResourceAttributes, name s
 	return result
 }
 
-func getOptionalAttribute[T any](attributes scim.ResourceAttributes, name string, fallback T) T {
+func getOptionalAttribute(attributes scim.ResourceAttributes, name string) []string {
 	value, ok := attributes[name]
 
 	if !ok {
-		return fallback
+		return []string{}
 	}
 
-	return value.(T)
+	return []string{value.(string)}
 }
 
 func ldapMailToSCIMMail(entry *ldap.Entry) []interface{} {
@@ -310,13 +379,109 @@ func ldapMailToSCIMMail(entry *ldap.Entry) []interface{} {
 
 func ldapEntryToUserResource(entry *ldap.Entry) scim.Resource {
 
-	return scim.Resource{
-		ID:         entry.GetAttributeValue("uuid"),
-		ExternalID: optional.NewString(entry.DN),
-		Attributes: map[string]interface{}{
-			"userName":    entry.GetAttributeValue("uid"),
-			"displayName": entry.GetAttributeValue("cn"),
-			"emails":      ldapMailToSCIMMail(entry),
-		},
+	name := map[string]interface{}{
+		"familyName": entry.GetAttributeValue("sn"),
+		"givenName":  entry.GetAttributeValue("givenName"),
+		"formatted":  entry.GetAttributeValue("cn"),
 	}
+
+	active, err := strconv.ParseBool(entry.GetAttributeValue("isActive"))
+
+	if err != nil {
+		slog.Warn("Error parsing active value", "value", entry.GetAttributeValue("isActive"))
+		return scim.Resource{}
+	}
+
+	attributes := map[string]interface{}{
+		"userName": entry.GetAttributeValue("uid"),
+		"name":     name,
+		"emails":   ldapMailToSCIMMail(entry),
+		"active":   active,
+	}
+
+	address := ldapToAddress(entry)
+
+	if len(address) > 0 {
+		attributes["addresses"] = []map[string]interface{}{address}
+	}
+
+	phoneNumbers := ldapToPhones(entry)
+
+	if len(phoneNumbers) > 0 {
+		attributes["phoneNumbers"] = phoneNumbers
+	}
+
+	sshPubKeys := entry.GetAttributeValues("sshPublicKey")
+	if len(sshPubKeys) > 0 {
+		attributes["sshPublicKey"] = sshPubKeys
+	}
+
+	optionalAttributeToResource(entry, attributes, "title", "title")
+	optionalAttributeToResource(entry, attributes, "o", "organization")
+
+	return scim.Resource{
+		ID:         entry.GetAttributeValue("uid"),
+		ExternalID: optional.NewString(entry.DN),
+		Attributes: attributes,
+	}
+}
+
+func ldapToPhones(entry *ldap.Entry) []map[string]interface{} {
+	var phoneNumbers []map[string]interface{}
+
+	if mobile, ok := optionalAttribute(entry, "mobile"); ok {
+		phoneNumbers = append(phoneNumbers, map[string]interface{}{
+			"value": mobile,
+			"type":  "mobile",
+		})
+	}
+
+	if workPhone, ok := optionalAttribute(entry, "telephoneNumber"); ok {
+		phoneNumbers = append(phoneNumbers, map[string]interface{}{
+			"value": workPhone,
+			"type":  "work",
+		})
+	}
+	return phoneNumbers
+}
+
+func ldapToAddress(entry *ldap.Entry) map[string]interface{} {
+	address := map[string]interface{}{}
+
+	if street, ok := optionalAttribute(entry, "street"); ok {
+		address["streetAddress"] = street
+	}
+
+	if postalCode, ok := optionalAttribute(entry, "postalCode"); ok {
+		address["postalCode"] = postalCode
+	}
+
+	if locality, ok := optionalAttribute(entry, "l"); ok {
+		address["locality"] = locality
+	}
+
+	if country, ok := optionalAttribute(entry, "c"); ok {
+		address["country"] = country
+	}
+
+	if region, ok := optionalAttribute(entry, "st"); ok {
+		address["region"] = region
+	}
+	return address
+}
+
+func optionalAttribute(entry *ldap.Entry, attribute string) (string, bool) {
+	values := entry.GetAttributeValues(attribute)
+	if len(values) == 0 {
+		return "", false
+	}
+	return values[0], true
+}
+
+func optionalAttributeToResource(entry *ldap.Entry, attributes map[string]interface{}, attribute string, target string) {
+	values := entry.GetAttributeValues(attribute)
+	if len(values) == 0 {
+		return
+	}
+	attributes[target] = &values[0]
 }
