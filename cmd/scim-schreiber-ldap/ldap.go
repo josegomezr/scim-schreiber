@@ -87,7 +87,7 @@ func (l *LdapUtil) CreateUser(dn string, attributes map[string][]string) (string
 	return dn, nil
 }
 
-func (l *LdapUtil) CreateTestUser(username string, password string, uuid string) (string, error) {
+func (l *LdapUtil) CreateTestUser(username string, password string) (string, error) {
 	dn := fmt.Sprintf("uid=%s,%s,%s", username, l.baseUserOu, l.baseDn)
 
 	addReq := ldap.NewAddRequest(dn, []ldap.Control{})
@@ -98,7 +98,6 @@ func (l *LdapUtil) CreateTestUser(username string, password string, uuid string)
 	addReq.Attribute("uid", []string{username})
 	addReq.Attribute("isActive", []string{"true"})
 	addReq.Attribute("employeeNumber", []string{"1234"})
-	addReq.Attribute("uuid", []string{uuid})
 
 	if err := l.conn.Add(addReq); err != nil {
 		log.Fatal("error adding user:", addReq, err)
@@ -297,10 +296,6 @@ func (l *LdapUtil) _searchUser(uid string, field string) *ldap.Entry {
 
 func (l *LdapUtil) searchUser(uid string) *ldap.Entry {
 	return l._searchUser(uid, "uid")
-}
-
-func (l *LdapUtil) searchUserByUUID(uid string) *ldap.Entry {
-	return l._searchUser(uid, "uuid")
 }
 
 func (l *LdapUtil) searchUserByDN(dn string) *ldap.Entry {

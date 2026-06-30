@@ -12,13 +12,10 @@ import (
 	"github.com/elimity-com/scim/optional"
 	"github.com/go-ldap/ldap/v3"
 	scim_filter_parser "github.com/scim2/filter-parser/v2"
-
-	"github.com/josegomezr/scim-schreiber-ldap/internal/uuidgenerator"
 )
 
 type UserHandler struct {
-	cfg           *Config
-	uuidGenerator uuidgenerator.UUIDGenerator
+	cfg *Config
 }
 
 func (h UserHandler) Create(r *http.Request, attributes scim.ResourceAttributes) (scim.Resource, error) {
@@ -55,7 +52,6 @@ func (h UserHandler) Create(r *http.Request, attributes scim.ResourceAttributes)
 	externalId := attributes["externalId"].(string)
 
 	ldapAttributes["employeeNumber"] = []string{"-1"}
-	ldapAttributes["uuid"] = []string{h.uuidGenerator.NewUUID(externalId)}
 
 	dn, err := ldapCtx.CreateUser(externalId, ldapAttributes)
 
