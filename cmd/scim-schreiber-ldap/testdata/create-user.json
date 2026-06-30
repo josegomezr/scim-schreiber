@@ -4,7 +4,7 @@
   "name": {
     "givenName": "Jose",
     "familyName": "Gomez",
-    "formatted":"change: José Gómez"
+    "formatted":"José Gómez"
   },
   "externalId": "uid=jgomez,ou=people,dc=suse,dc=com",
   "active": true,

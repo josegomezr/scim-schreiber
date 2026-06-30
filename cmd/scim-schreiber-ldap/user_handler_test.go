@@ -132,7 +132,7 @@ func (suite *SCIMUserTestSuite) TestCreateUser() {
   "name": {
     "givenName": "Jose",
     "familyName": "Gomez",
-    "formatted":"change: José Gómez"
+    "formatted":"José Gómez"
   },
   "schemas": [
     "urn:ietf:params:model:schemas:core:2.0:User"
