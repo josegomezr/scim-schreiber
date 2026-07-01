@@ -30,7 +30,7 @@ func CreateLdapContainer(ctx context.Context) (*LdapContainer, error) {
 	}
 
 	baseDN := "dc=suse,dc=com"
-	exitCode, _, err := ldapContainer.Exec(ctx, []string{"dsconf", "localhost", "backend", "create", "--suffix", baseDN, "--be-name", "userroot", "--create-suffix", "--create-entries"})
+	exitCode, _, err := ldapContainer.Exec(ctx, []string{"dsconf", "localhost", "backend", "create", "--suffix", baseDN, "--be-name", "userroot", "--create-suffix"})
 	if err != nil {
 		return nil, err
 	}
@@ -41,13 +41,15 @@ func CreateLdapContainer(ctx context.Context) (*LdapContainer, error) {
 
 	exitCode, _, err = ldapContainer.Exec(ctx, []string{"bash", "-c", `
 	set -e
+    dsidm -b "dc=suse,dc=com" localhost organizationalunit create --ou people
+	dsidm -b "dc=suse,dc=com" localhost organizationalunit create --ou groups
     dsconf localhost schema attributetypes add isActive --oid=1.3.6.1.4.1.7057.340.1.1.2 --desc="Account is active" --syntax=1.3.6.1.4.1.1466.115.121.1.7 --single-value --x-origin="user defined" --equality=booleanMatch
 	dsconf localhost schema attributetypes add sshPublicKey --oid=1.3.6.1.4.1.7057.340.1.1.12 --desc="SSH public keys" --syntax=1.3.6.1.4.1.1466.115.121.1.15 --single-value --x-origin="user defined" --equality=caseIgnoreMatch
 	dsconf localhost schema attributetypes add gpgPublicKey --oid=1.3.6.1.4.1.7057.340.1.1.13 --desc="GPG public keys" --syntax=1.3.6.1.4.1.1466.115.121.1.15 --single-value --x-origin="user defined" --equality=caseIgnoreMatch
 	dsconf localhost schema attributetypes add communityUid --oid=1.3.6.1.4.1.7057.340.1.1.14 --desc="Community unique user name" --syntax=1.3.6.1.4.1.1466.115.121.1.15 --single-value --x-origin="user defined" --equality=caseIgnoreMatch
 	dsconf localhost schema attributetypes add entitlements --oid=1.3.6.1.4.1.7057.340.1.1.18 --desc="Flags used in other services" --syntax=1.3.6.1.4.1.1466.115.121.1.15 --multi-value --x-origin="user defined" --equality=caseIgnoreMatch
 	dsconf localhost schema attributetypes add uuid --oid=1.3.6.1.4.1.7057.340.1.1.19 --desc="Unique unit identifier" --syntax=1.3.6.1.4.1.1466.115.121.1.15 --single-value --x-origin="user defined" --equality=caseIgnoreMatch
-	dsconf localhost schema objectclasses add suseuser --oid=1.3.6.1.4.1.7057.340.1.1 --desc="SUSE user object" --sup=inetOrgPerson --kind=STRUCTURAL --must uid employeeNumber isActive --may sshPublicKey gpgPublicKey communityUid entitlements uuid
+	dsconf localhost schema objectclasses add suseuser --oid=1.3.6.1.4.1.7057.340.1.1 --desc="SUSE user object" --sup=inetOrgPerson --kind=STRUCTURAL --must uid employeeNumber isActive --may sshPublicKey gpgPublicKey communityUid entitlements uuid c st
     `})
 	if err != nil {
 		return nil, err

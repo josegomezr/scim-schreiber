@@ -7,6 +7,8 @@ import (
 
 	"github.com/elimity-com/scim"
 	"github.com/elimity-com/scim/optional"
+
+	"github.com/josegomezr/scim-schreiber-ldap/internal/logging"
 	"github.com/josegomezr/scim-schreiber-ldap/internal/model"
 )
 
@@ -40,7 +42,9 @@ func startHttpServer(server scim.Server, err error) {
 		w.WriteHeader(200)
 	})
 
-	mux.Handle("/", server)
+	accessLogger := logging.NewAccessLogger(server)
+	accessLogger.EnableBodyLogging()
+	mux.Handle("/", accessLogger)
 
 	listenAddr := ":9440"
 	slog.Info("Listening", "listenAddr", listenAddr)

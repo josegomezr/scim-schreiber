@@ -14,6 +14,7 @@ type UserName struct {
 // TODO(josegomezr): Expand on the property mappings side and here what do we
 // want to persist from authentik into LDAP
 
+// https://datatracker.ietf.org/doc/html/rfc7643
 var UserSchema = schema.Schema{
 	ID:          "urn:ietf:params:model:schemas:core:2.0:User",
 	Name:        optional.NewString("User"),
@@ -53,10 +54,8 @@ var UserSchema = schema.Schema{
 			},
 		}),
 		schema.SimpleCoreAttribute(schema.SimpleStringParams(schema.StringParams{
-			Name:       "externalId",
-			Required:   false,
-			Mutability: schema.AttributeMutabilityReadOnly(),
-			Returned:   schema.AttributeReturnedAlways(),
+			Name:     "externalId",
+			Required: true,
 		})),
 		schema.ComplexCoreAttribute(schema.ComplexParams{
 			Name:        "name",
@@ -78,14 +77,69 @@ var UserSchema = schema.Schema{
 			},
 		}),
 		schema.SimpleCoreAttribute(schema.SimpleStringParams(schema.StringParams{
-			Name:     "displayName",
-			Required: true,
-		})),
-		schema.SimpleCoreAttribute(schema.SimpleStringParams(schema.StringParams{
 			Name:       "userName",
 			Required:   true,
 			Uniqueness: schema.AttributeUniquenessServer(),
 		})),
+		schema.SimpleCoreAttribute(schema.SimpleStringParams(schema.StringParams{
+			Name:     "title",
+			Required: false,
+		})),
+		schema.SimpleCoreAttribute(schema.SimpleStringParams(schema.StringParams{
+			Name:     "organization",
+			Required: false,
+		})),
+		schema.ComplexCoreAttribute(schema.ComplexParams{
+			Name:        "addresses",
+			Required:    false,
+			MultiValued: true,
+			SubAttributes: []schema.SimpleParams{
+				schema.SimpleStringParams(schema.StringParams{
+					Name:     "streetAddress",
+					Required: false,
+				}),
+				schema.SimpleStringParams(schema.StringParams{
+					Name:     "locality",
+					Required: false,
+				}),
+				schema.SimpleStringParams(schema.StringParams{
+					Name:     "postalCode",
+					Required: false,
+				}),
+				schema.SimpleStringParams(schema.StringParams{
+					Name:     "region",
+					Required: false,
+				}),
+				schema.SimpleStringParams(schema.StringParams{
+					Name:     "country",
+					Required: false,
+				}),
+			},
+		}),
+		schema.ComplexCoreAttribute(schema.ComplexParams{
+			Name:        "phoneNumbers",
+			Required:    false,
+			MultiValued: true,
+			Description: optional.NewString(`
+			Phone numbers for the User.  The value
+			SHOULD be canonicalized by the service provider according to the
+			format specified in RFC 3966, e.g., 'tel:+1-201-555-0123'.
+			Canonical type values of 'work', 'home', 'mobile', 'fax', 'pager',
+			and 'other'.
+			`),
+			SubAttributes: []schema.SimpleParams{
+				schema.SimpleStringParams(schema.StringParams{
+					Name:        "value",
+					Required:    false,
+					Description: optional.NewString("Phone number of the User."),
+				}),
+				schema.SimpleStringParams(schema.StringParams{
+					Name:        "type",
+					Required:    false,
+					Description: optional.NewString("A label indicating the attribute's function, e.g., 'work', 'home', 'mobile'."),
+				}),
+			},
+		}),
 	},
 }
 

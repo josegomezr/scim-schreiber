@@ -1,13 +1,17 @@
 package main
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
 
 	"github.com/elimity-com/scim"
 	"github.com/elimity-com/scim/errors"
+	"github.com/elimity-com/scim/filter"
 	"github.com/elimity-com/scim/optional"
 	"github.com/go-ldap/ldap/v3"
+	scim_filter_parser "github.com/scim2/filter-parser/v2"
+
 	"github.com/josegomezr/scim-schreiber-ldap/internal/model"
 )
 
@@ -62,15 +66,12 @@ func ldapEntryToGroupResource(entry *ldap.Entry) scim.Resource {
 		})
 	}
 
-	// TODO: Id's need something more qualifies, maybe we can use the UUID
-	// generated in the IDP
-	//
-	// If not we should fallback to DN's everywhere.
+	// Display Name must be unique since that is what Authentik uses as a primary key to search for groups.
 	return scim.Resource{
 		ID:         entry.GetAttributeValue("cn"),
 		ExternalID: optional.NewString(entry.DN),
 		Attributes: map[string]interface{}{
-			"displayName": entry.GetAttributeValue("o"),
+			"displayName": entry.GetAttributeValue("cn"),
 			"members":     members,
 		},
 	}
@@ -120,6 +121,23 @@ func (h GroupHandler) Get(r *http.Request, id string) (scim.Resource, error) {
 	return scim.Resource{}, errors.ScimErrorResourceNotFound(id)
 }
 
+func displayNameFromFilter(filterValidator *filter.Validator) (string, error) {
+	if filterValidator == nil {
+		return "*", nil
+	}
+	f, ok := filterValidator.GetFilter().(*scim_filter_parser.AttributeExpression)
+	if !ok {
+		return "", fmt.Errorf("only single expressions are supported")
+	}
+	if f.Operator != "eq" {
+		return "", fmt.Errorf("only operator 'eq' is supported in filters")
+	}
+	if f.AttributePath.AttributeName != "displayName" {
+		return "", fmt.Errorf("only 'displayName' is supported in filters")
+	}
+	return f.CompareValue.(string), nil
+}
+
 func (h GroupHandler) GetAll(r *http.Request, params scim.ListRequestParams) (scim.Page, error) {
 	ldapCtx, ok := GetLDAPContext(r.Context())
 
@@ -144,14 +162,13 @@ func (h GroupHandler) GetAll(r *http.Request, params scim.ListRequestParams) (sc
 
 	resources := make([]scim.Resource, 0)
 
-	if params.FilterValidator != nil {
-		err := params.FilterValidator.Validate()
-		if err != nil {
-			return scim.Page{}, err
-		}
+	dnFilter, err := displayNameFromFilter(params.FilterValidator)
+
+	if err != nil {
+		return scim.Page{}, errors.ScimErrorInternal
 	}
 
-	groups, err := ldapCtx.searchGroups("*", "cn")
+	groups, err := ldapCtx.searchGroups(dnFilter, "cn")
 
 	if err != nil {
 		return scim.Page{}, errors.ScimErrorInternal
@@ -188,16 +205,15 @@ func (h GroupHandler) GetAll(r *http.Request, params scim.ListRequestParams) (sc
 
 func (h GroupHandler) scimToLdapAttributes(attributes map[string][]string) map[string][]string {
 	result := make(map[string][]string)
+
 	for attribute, value := range attributes {
-		name := attribute
 		switch attribute {
-		case "displayName":
-			name = "o"
+		case "members.value":
+			result["memberUid"] = value
 			break
 		}
-
-		result[name] = value
 	}
+
 	return result
 }
 
@@ -230,9 +246,6 @@ func (h GroupHandler) Patch(r *http.Request, id string, operations []scim.PatchO
 	removes = h.scimToLdapAttributes(removes)
 	replaces = h.scimToLdapAttributes(replaces)
 
-	h.transformMemberUUIDtoUID(ldapCtx, adds, "members.value", "memberUid")
-	h.transformMemberUUIDtoUID(ldapCtx, removes, "members.value", "memberUid")
-
 	err = ldapCtx.UpdateEntry(entry.DN, adds, removes, replaces)
 
 	if err != nil {
@@ -253,25 +266,6 @@ func (h GroupHandler) Patch(r *http.Request, id string, operations []scim.PatchO
 
 func (h GroupHandler) Replace(r *http.Request, id string, attributes scim.ResourceAttributes) (scim.Resource, error) {
 	return scim.Resource{}, errors.ScimError{Status: http.StatusNotImplemented}
-}
-
-func (h *GroupHandler) transformMemberUUIDtoUID(ldapCtx *LdapUtil, attrmap map[string][]string, source string, dest string) {
-	if attrmap[source] == nil {
-		return
-	}
-
-	if attrmap[dest] == nil {
-		attrmap[dest] = make([]string, 0)
-	}
-
-	for _, userUuid := range attrmap[source] {
-		if lookup := ldapCtx.searchUserByUUID(userUuid); lookup != nil {
-			attrmap[dest] = append(attrmap[dest], lookup.GetAttributeValue("uid"))
-		}
-	}
-
-	delete(attrmap, source)
-
 }
 
 func convertToLdap(input interface{}, path string, output map[string][]string) {
