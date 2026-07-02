@@ -77,7 +77,8 @@ func (suite *SCIMGroupTestSuite) SetupSuite() {
 }
 
 func (suite *SCIMGroupTestSuite) BeforeTest(suiteName, testName string) {
-	_, err := suite.ldapCtx.CreateGroup(testGroupId, "Test Group", 1000)
+	dn := fmt.Sprintf("cn=%s,%s,%s", testGroupId, suite.ldapCtx.baseGroupOu, suite.ldapCtx.baseDn)
+	_, err := suite.ldapCtx.CreateGroup(dn, "Test Group", 1000)
 	assert.NoError(suite.T(), err)
 
 	_, err = suite.ldapCtx.CreateTestUser("test", "changeme")
@@ -85,10 +86,12 @@ func (suite *SCIMGroupTestSuite) BeforeTest(suiteName, testName string) {
 }
 
 func (suite *SCIMGroupTestSuite) AfterTest(suiteName, testName string) {
-	err := suite.ldapCtx.DeleteUser("test")
+	dn := fmt.Sprintf("uid=%s,%s,%s", "test", suite.ldapCtx.baseUserOu, suite.ldapCtx.baseDn)
+	err := suite.ldapCtx.Delete(dn)
 	assert.NoError(suite.T(), err)
 
-	err = suite.ldapCtx.DeleteGroup(testGroupId)
+	dn = fmt.Sprintf("cn=%s,%s,%s", testGroupId, suite.ldapCtx.baseGroupOu, suite.ldapCtx.baseDn)
+	err = suite.ldapCtx.Delete(dn)
 	assert.NoError(suite.T(), err)
 }
 
@@ -302,11 +305,12 @@ func (suite *SCIMGroupTestSuite) TestPatch() {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			group, err := suite.ldapCtx.CreateGroup("group-"+name, "PATCH-"+name, 1000)
+			dn := fmt.Sprintf("cn=%s,%s,%s", "group-"+name, suite.ldapCtx.baseGroupOu, suite.ldapCtx.baseDn)
+			group, err := suite.ldapCtx.CreateGroup(dn, "PATCH-"+name, 1000)
 			assert.NoError(t, err)
 
 			t.Cleanup(func() {
-				suite.ldapCtx.DeleteGroup(group)
+				suite.ldapCtx.Delete(group)
 			})
 
 			request, _ := http.NewRequest(http.MethodPatch, "/Groups/group-"+name, strings.NewReader(test.request))
