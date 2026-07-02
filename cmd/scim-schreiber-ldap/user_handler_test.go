@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	_ "embed"
+	"fmt"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -78,9 +79,11 @@ func (suite *SCIMUserTestSuite) BeforeTest(suiteName, testName string) {
 }
 
 func (suite *SCIMUserTestSuite) AfterTest(suiteName, testName string) {
-	err := suite.ldapCtx.DeleteUser("test")
+	dn := fmt.Sprintf("uid=%s,%s,%s", "test", suite.ldapCtx.baseUserOu, suite.ldapCtx.baseDn)
+	err := suite.ldapCtx.Delete(dn)
 	require.NoError(suite.T(), err)
-	err = suite.ldapCtx.DeleteUser("jgomez")
+	dn = fmt.Sprintf("uid=%s,%s,%s", "jgomez", suite.ldapCtx.baseUserOu, suite.ldapCtx.baseDn)
+	err = suite.ldapCtx.Delete(dn)
 	require.NoError(suite.T(), err)
 }
 
@@ -395,4 +398,30 @@ func (suite *SCIMUserTestSuite) TestFilterUsers() {
 
 func TestSCIMUserTestSuite(t *testing.T) {
 	suite.Run(t, new(SCIMUserTestSuite))
+}
+
+func (l *LdapUtil) CreateTestUser(username string, password string) (string, error) {
+	dn := fmt.Sprintf("uid=%s,%s,%s", username, l.baseUserOu, l.baseDn)
+
+	addReq := ldap.NewAddRequest(dn, []ldap.Control{})
+	addReq.Attribute("objectClass", []string{"suseuser"})
+	addReq.Attribute("sn", []string{"Surname"})
+	addReq.Attribute("givenName", []string{"First Name"})
+	addReq.Attribute("cn", []string{"Max Mustermann"})
+	addReq.Attribute("uid", []string{username})
+	addReq.Attribute("isActive", []string{"true"})
+	addReq.Attribute("employeeNumber", []string{"1234"})
+
+	if err := l.conn.Add(addReq); err != nil {
+		log.Fatal("error adding user:", addReq, err)
+		return "", err
+	}
+
+	modifyReq := ldap.NewPasswordModifyRequest(dn, "", password)
+	_, err := l.conn.PasswordModify(modifyReq)
+	if err != nil {
+		log.Fatal("error setting user password:", err)
+	}
+
+	return dn, nil
 }

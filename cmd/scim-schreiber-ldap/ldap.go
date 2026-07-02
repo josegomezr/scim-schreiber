@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"iter"
 	"log"
@@ -47,11 +48,62 @@ func (l *LdapUtil) connect() error {
 	return nil
 }
 
-func (l *LdapUtil) CreateGroup(id string, name string, gid int) (string, error) {
-	dn := fmt.Sprintf("cn=%s,%s,%s", id, l.baseGroupOu, l.baseDn)
+func (l *LdapUtil) isValidRDN(parsedDn *ldap.DN, attributeName string) bool {
+	if len(parsedDn.RDNs) == 0 {
+		return false
+	}
+
+	firstRDN := parsedDn.RDNs[0]
+
+	// For our DNs we only expect one attribute (uid or cn typically)
+	if len(firstRDN.Attributes) != 1 {
+		return false
+	}
+
+	return firstRDN.Attributes[0].Type == attributeName
+}
+
+func (l *LdapUtil) isValidGroupDn(dn string) bool {
+	parsedDn, err := ldap.ParseDN(dn)
+	if err != nil {
+		return false
+	}
+
+	baseDN, err := ldap.ParseDN(l.baseGroupOu + "," + l.baseDn)
+	if err != nil {
+		return false
+	}
+
+	// 1. Verify that we have a cn in the first part of the dn
+	// 2. Verify that the dn is under the correct ou
+	return l.isValidRDN(parsedDn, "cn") && baseDN.AncestorOf(parsedDn)
+}
+
+func (l *LdapUtil) isValidUserDn(dn string) bool {
+	parsedDn, err := ldap.ParseDN(dn)
+	if err != nil {
+		return false
+	}
+
+	baseDN, err := ldap.ParseDN(l.baseUserOu + "," + l.baseDn)
+	if err != nil {
+		return false
+	}
+
+	// 1. Verify that we have a uid in the first part of the dn
+	// 2. Verify that the dn is under the correct ou
+	return l.isValidRDN(parsedDn, "uid") && baseDN.AncestorOf(parsedDn)
+}
+
+func (l *LdapUtil) CreateGroup(dn string, oktaName string, gid int) (string, error) {
+
+	if !l.isValidGroupDn(dn) {
+		return "", errors.New("invalid DN")
+	}
+
 	addReq := ldap.NewAddRequest(dn, []ldap.Control{})
 	addReq.Attribute("objectClass", []string{"top", "organization", "posixGroup"})
-	addReq.Attribute("o", []string{name})
+	addReq.Attribute("o", []string{oktaName})
 	addReq.Attribute("gidNumber", []string{strconv.Itoa(gid)})
 
 	if err := l.conn.Add(addReq); err != nil {
@@ -62,14 +114,29 @@ func (l *LdapUtil) CreateGroup(id string, name string, gid int) (string, error) 
 	return dn, nil
 }
 
-func (l *LdapUtil) DeleteGroup(id string) error {
-	dn := fmt.Sprintf("cn=%s,%s,%s", id, l.baseGroupOu, l.baseDn)
+func (l *LdapUtil) Delete(dn string) error {
+
+	if !l.isValidGroupDn(dn) && !l.isValidUserDn(dn) {
+		return errors.New("invalid DN")
+	}
+
 	err := l.conn.Del(ldap.NewDelRequest(dn, []ldap.Control{}))
+
+	// Ignore already deleted objects
+	if err != nil {
+		if err.(*ldap.Error).ResultCode == ldap.LDAPResultNoSuchObject {
+			return nil
+		}
+	}
 
 	return err
 }
 
 func (l *LdapUtil) CreateUser(dn string, attributes map[string][]string) (string, error) {
+	if !l.isValidUserDn(dn) {
+		return "", errors.New("invalid DN")
+	}
+
 	addReq := ldap.NewAddRequest(dn, []ldap.Control{})
 	addReq.Attribute("objectClass", []string{"inetOrgPerson", "organizationalPerson", "person", "suseuser", "top"})
 
@@ -85,45 +152,6 @@ func (l *LdapUtil) CreateUser(dn string, attributes map[string][]string) (string
 	}
 
 	return dn, nil
-}
-
-func (l *LdapUtil) CreateTestUser(username string, password string) (string, error) {
-	dn := fmt.Sprintf("uid=%s,%s,%s", username, l.baseUserOu, l.baseDn)
-
-	addReq := ldap.NewAddRequest(dn, []ldap.Control{})
-	addReq.Attribute("objectClass", []string{"suseuser"})
-	addReq.Attribute("sn", []string{"Surname"})
-	addReq.Attribute("givenName", []string{"First Name"})
-	addReq.Attribute("cn", []string{"Max Mustermann"})
-	addReq.Attribute("uid", []string{username})
-	addReq.Attribute("isActive", []string{"true"})
-	addReq.Attribute("employeeNumber", []string{"1234"})
-
-	if err := l.conn.Add(addReq); err != nil {
-		log.Fatal("error adding user:", addReq, err)
-		return "", err
-	}
-
-	modifyReq := ldap.NewPasswordModifyRequest(dn, "", password)
-	_, err := l.conn.PasswordModify(modifyReq)
-	if err != nil {
-		log.Fatal("error setting user password:", err)
-	}
-
-	return dn, nil
-}
-
-func (l *LdapUtil) DeleteUser(username string) error {
-	dn := fmt.Sprintf("uid=%s,%s,%s", username, l.baseUserOu, l.baseDn)
-	err := l.conn.Del(ldap.NewDelRequest(dn, []ldap.Control{}))
-
-	if err != nil {
-		if err.(*ldap.Error).ResultCode == ldap.LDAPResultNoSuchObject {
-			return nil
-		}
-	}
-
-	return err
 }
 
 func (l *LdapUtil) disconnect() error {
@@ -212,6 +240,10 @@ func (l *LdapUtil) SearchIter(filter string, baseUid string) iter.Seq2[*ldap.Ent
 }
 
 func (l *LdapUtil) UpdateEntry(dn string, adds map[string][]string, removes map[string][]string, replaces map[string][]string) error {
+	if !l.isValidGroupDn(dn) && !l.isValidUserDn(dn) {
+		return errors.New("invalid DN")
+	}
+
 	request := ldap.NewModifyRequest(dn, nil)
 
 	if adds != nil {
