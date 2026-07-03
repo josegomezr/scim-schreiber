@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/josegomezr/scim-schreiber-ldap/cmd/scim-schreiber-ldap/testhelpers"
+	"github.com/josegomezr/scim-schreiber-ldap/internal/uuidgenerator"
 )
 
 const (
@@ -49,7 +50,7 @@ func (suite *SCIMGroupTestSuite) SetupSuite() {
 		GroupCreationIsUpsert: true,
 	}
 
-	server, err := createSCIMServer(cfg)
+	server, err := createSCIMServer(cfg, uuidgenerator.UUIDGeneratorMock{})
 	require.NoError(suite.T(), err)
 
 	suite.server = server
@@ -81,7 +82,7 @@ func (suite *SCIMGroupTestSuite) BeforeTest(suiteName, testName string) {
 	_, err := suite.ldapCtx.CreateGroup(dn, "Test Group", 1000)
 	assert.NoError(suite.T(), err)
 
-	_, err = suite.ldapCtx.CreateTestUser("test", "changeme")
+	_, err = suite.ldapCtx.CreateTestUser("test", "changeme", testUserUUID)
 	assert.NoError(suite.T(), err)
 }
 

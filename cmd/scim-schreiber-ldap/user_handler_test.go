@@ -21,6 +21,11 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/josegomezr/scim-schreiber-ldap/cmd/scim-schreiber-ldap/testhelpers"
+	"github.com/josegomezr/scim-schreiber-ldap/internal/uuidgenerator"
+)
+
+const (
+	testUserUUID = "2a19013f-6a7e-4293-8782-6275d43ca030"
 )
 
 type SCIMUserTestSuite struct {
@@ -46,7 +51,7 @@ func (suite *SCIMUserTestSuite) SetupSuite() {
 		GroupCreationIsUpsert: true,
 	}
 
-	server, err := createSCIMServer(cfg)
+	server, err := createSCIMServer(cfg, uuidgenerator.UUIDGeneratorMock{})
 	require.NoError(suite.T(), err)
 
 	suite.server = server
@@ -74,7 +79,7 @@ func (suite *SCIMUserTestSuite) SetupSuite() {
 }
 
 func (suite *SCIMUserTestSuite) BeforeTest(suiteName, testName string) {
-	_, err := suite.ldapCtx.CreateTestUser("test", "changeme")
+	_, err := suite.ldapCtx.CreateTestUser("test", "changeme", testUserUUID)
 	require.NoError(suite.T(), err)
 }
 
@@ -400,7 +405,7 @@ func TestSCIMUserTestSuite(t *testing.T) {
 	suite.Run(t, new(SCIMUserTestSuite))
 }
 
-func (l *LdapUtil) CreateTestUser(username string, password string) (string, error) {
+func (l *LdapUtil) CreateTestUser(username string, password string, uuid string) (string, error) {
 	dn := fmt.Sprintf("uid=%s,%s,%s", username, l.baseUserOu, l.baseDn)
 
 	addReq := ldap.NewAddRequest(dn, []ldap.Control{})
@@ -411,6 +416,7 @@ func (l *LdapUtil) CreateTestUser(username string, password string) (string, err
 	addReq.Attribute("uid", []string{username})
 	addReq.Attribute("isActive", []string{"true"})
 	addReq.Attribute("employeeNumber", []string{"1234"})
+	addReq.Attribute("uuid", []string{uuid})
 
 	if err := l.conn.Add(addReq); err != nil {
 		log.Fatal("error adding user:", addReq, err)

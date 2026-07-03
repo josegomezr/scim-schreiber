@@ -10,6 +10,7 @@ import (
 
 	"github.com/josegomezr/scim-schreiber-ldap/internal/logging"
 	"github.com/josegomezr/scim-schreiber-ldap/internal/model"
+	"github.com/josegomezr/scim-schreiber-ldap/internal/uuidgenerator"
 )
 
 type Config struct {
@@ -25,7 +26,7 @@ func main() {
 
 	testConnection()
 
-	server, err := createSCIMServer(cfg)
+	server, err := createSCIMServer(cfg, uuidgenerator.UUIDGeneratorImpl{})
 
 	if err != nil {
 		slog.Error("Failed to create server", "err", err)
@@ -67,7 +68,7 @@ func testConnection() {
 	l.disconnect()
 }
 
-func createSCIMServer(cfg Config) (scim.Server, error) {
+func createSCIMServer(cfg Config, uuidgenerator uuidgenerator.UUIDGenerator) (scim.Server, error) {
 	config := scim.ServiceProviderConfig{
 		AuthenticationSchemes: []scim.AuthenticationScheme{
 			{
@@ -90,7 +91,8 @@ func createSCIMServer(cfg Config) (scim.Server, error) {
 			Description: optional.NewString("User Account"),
 			Schema:      model.UserSchema,
 			Handler: UserHandler{
-				cfg: &cfg,
+				cfg:           &cfg,
+				uuidGenerator: uuidgenerator,
 			},
 		},
 		{

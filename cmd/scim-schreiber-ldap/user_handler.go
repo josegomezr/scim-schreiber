@@ -12,10 +12,13 @@ import (
 	"github.com/elimity-com/scim/optional"
 	"github.com/go-ldap/ldap/v3"
 	scim_filter_parser "github.com/scim2/filter-parser/v2"
+
+	"github.com/josegomezr/scim-schreiber-ldap/internal/uuidgenerator"
 )
 
 type UserHandler struct {
-	cfg *Config
+	cfg           *Config
+	uuidGenerator uuidgenerator.UUIDGenerator
 }
 
 func (h UserHandler) Create(r *http.Request, attributes scim.ResourceAttributes) (scim.Resource, error) {
@@ -38,7 +41,7 @@ func (h UserHandler) Create(r *http.Request, attributes scim.ResourceAttributes)
 		}
 	}
 
-	if ldapCtx.searchUser(username) != nil {
+	if ldapCtx.searchUserByUsername(username) != nil {
 		return scim.Resource{}, errors.ScimErrorUniqueness
 	}
 
@@ -52,6 +55,7 @@ func (h UserHandler) Create(r *http.Request, attributes scim.ResourceAttributes)
 	externalId := attributes["externalId"].(string)
 
 	ldapAttributes["employeeNumber"] = []string{"-1"}
+	ldapAttributes["uuid"] = []string{h.uuidGenerator.NewUUID(externalId)}
 
 	dn, err := ldapCtx.CreateUser(externalId, ldapAttributes)
 
@@ -81,7 +85,7 @@ func (h UserHandler) Delete(r *http.Request, id string) error {
 		}
 	}
 
-	if u := ldapCtx.searchUser(id); u != nil {
+	if u := ldapCtx.searchUserByUsername(id); u != nil {
 		// TODO delete the user
 	}
 
@@ -101,7 +105,7 @@ func (h UserHandler) Get(r *http.Request, id string) (scim.Resource, error) {
 		}
 	}
 
-	entry := ldapCtx.searchUser(id)
+	entry := ldapCtx.searchUserByUsername(id)
 
 	if entry == nil {
 		return scim.Resource{}, errors.ScimErrorResourceNotFound(id)
@@ -219,7 +223,7 @@ func (h UserHandler) Patch(r *http.Request, id string, operations []scim.PatchOp
 		return scim.Resource{}, errors.ScimErrorBadRequest("Username must match id")
 	}
 
-	entry := ldapCtx.searchUser(id)
+	entry := ldapCtx.searchUserByUsername(id)
 	if entry == nil {
 		return scim.Resource{}, errors.ScimErrorResourceNotFound(id)
 	}
@@ -243,7 +247,7 @@ func (h UserHandler) Patch(r *http.Request, id string, operations []scim.PatchOp
 	}
 
 	// Get updated entry
-	entry = ldapCtx.searchUser(id)
+	entry = ldapCtx.searchUserByUsername(id)
 	// return resource with replaced attributes
 	return ldapEntryToUserResource(entry), nil
 }
@@ -416,6 +420,10 @@ func ldapEntryToUserResource(entry *ldap.Entry) scim.Resource {
 	optionalAttributeToResource(entry, attributes, "o", "organization")
 
 	return scim.Resource{
+		// This is the ID that will then be used to manage group memberships.
+		// Since memberUid fields should contain the uid we return the uid here instead of the uuid.
+		// This saves us from doing more mapping in the group handler
+		// that would require resolving the uuid to the uid and vice versa on each request.
 		ID:         entry.GetAttributeValue("uid"),
 		ExternalID: optional.NewString(entry.DN),
 		Attributes: attributes,
