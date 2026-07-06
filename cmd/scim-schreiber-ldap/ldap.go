@@ -326,7 +326,7 @@ func (l *LdapUtil) _searchUser(uid string, field string) *ldap.Entry {
 	return nil
 }
 
-func (l *LdapUtil) searchUser(uid string) *ldap.Entry {
+func (l *LdapUtil) searchUserByUsername(uid string) *ldap.Entry {
 	return l._searchUser(uid, "uid")
 }
 
