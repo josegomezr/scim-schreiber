@@ -281,7 +281,7 @@ func (h UserHandler) resourceToLdap(attributes map[string]interface{}) map[strin
 	}
 
 	replaces := map[string][]string{
-		"isActive":     {strconv.FormatBool(attributes["active"].(bool))},
+		"isActive":     {LdapBoolToString(attributes["active"].(bool))},
 		"cn":           {name["formatted"].(string)},
 		"givenName":    {name["givenName"].(string)},
 		"title":        getOptionalAttribute(attributes, "title"),
