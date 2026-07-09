@@ -3,59 +3,37 @@ package main
 import (
 	"log"
 	"log/slog"
-	"net/http"
 
 	"github.com/elimity-com/scim"
-	"github.com/elimity-com/scim/optional"
 
-	"github.com/josegomezr/scim-schreiber-ldap/internal/logging"
-	"github.com/josegomezr/scim-schreiber-ldap/internal/model"
+	"github.com/josegomezr/scim-schreiber-ldap/internal/server"
 	"github.com/josegomezr/scim-schreiber-ldap/internal/uuidgenerator"
 )
 
 type Config struct {
 	AllowUserCreation     bool
 	GroupCreationIsUpsert bool
+	UUIDGenerator         uuidgenerator.UUIDGenerator
 }
 
 func main() {
+	slog.SetDefault(server.GetLogger())
+
 	cfg := Config{
 		AllowUserCreation:     false,
 		GroupCreationIsUpsert: true,
+		UUIDGenerator:         uuidgenerator.UUIDGeneratorImpl{},
 	}
 
 	testConnection()
 
-	server, err := createSCIMServer(cfg, uuidgenerator.UUIDGeneratorImpl{})
-
+	scimServer, err := createSCIMServer(cfg)
 	if err != nil {
 		slog.Error("Failed to create server", "err", err)
 		return
 	}
 
-	startHttpServer(server, err)
-}
-
-func startHttpServer(server scim.Server, err error) {
-	mux := http.NewServeMux()
-
-	mux.HandleFunc("GET /-/live", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(200)
-	})
-
-	accessLogger := logging.NewAccessLogger(server)
-	accessLogger.EnableBodyLogging()
-	mux.Handle("/", accessLogger)
-
-	listenAddr := ":9440"
-	slog.Info("Listening", "listenAddr", listenAddr)
-	// TODO(josegomezr): configurable ports here
-	err = http.ListenAndServe(listenAddr, LdapMiddleware(mux))
-
-	if err != nil {
-		slog.Error("Failed to start http server", "err", err)
-		return
-	}
+	server.StartHttpServer(scimServer, LdapMiddleware)
 }
 
 func testConnection() {
@@ -68,53 +46,14 @@ func testConnection() {
 	l.disconnect()
 }
 
-func createSCIMServer(cfg Config, uuidgenerator uuidgenerator.UUIDGenerator) (scim.Server, error) {
-	config := scim.ServiceProviderConfig{
-		AuthenticationSchemes: []scim.AuthenticationScheme{
-			{
-				DocumentationURI: optional.NewString("http://someone-will-care.later.suse.com/"),
-				Name:             "HTTP Basic",
-				SpecURI:          optional.NewString("https://datatracker.ietf.org/doc/html/rfc7617"),
-				Type:             scim.AuthenticationTypeHTTPBasic,
-			},
+func createSCIMServer(cfg Config) (scim.Server, error) {
+	return server.NewSCIMServer(
+		UserHandler{
+			cfg:           &cfg,
+			uuidGenerator: cfg.UUIDGenerator,
 		},
-		DocumentationURI: optional.NewString("http://someone-will-care.later.suse.com/"),
-		SupportFiltering: true,
-		SupportPatch:     true,
-	}
-
-	resourceTypes := []scim.ResourceType{
-		{
-			ID:          optional.NewString("User"),
-			Name:        "User",
-			Endpoint:    "/Users",
-			Description: optional.NewString("User Account"),
-			Schema:      model.UserSchema,
-			Handler: UserHandler{
-				cfg:           &cfg,
-				uuidGenerator: uuidgenerator,
-			},
+		GroupHandler{
+			cfg: &cfg,
 		},
-		{
-			ID:          optional.NewString("Group"),
-			Name:        "Group",
-			Endpoint:    "/Groups",
-			Description: optional.NewString("Groups"),
-			Schema:      model.GroupSchema,
-			Handler: GroupHandler{
-				cfg: &cfg,
-			},
-		},
-	}
-
-	serverArgs := &scim.ServerArgs{
-		ServiceProviderConfig: &config,
-		ResourceTypes:         resourceTypes,
-	}
-
-	serverOpts := []scim.ServerOption{
-		scim.WithLogger(&ScimLogger{}), // optional, default is no logging
-	}
-
-	return scim.NewServer(serverArgs, serverOpts...)
+	)
 }

@@ -49,9 +49,10 @@ func (suite *SCIMUserTestSuite) SetupSuite() {
 	cfg := Config{
 		AllowUserCreation:     true,
 		GroupCreationIsUpsert: true,
+		UUIDGenerator:         uuidgenerator.UUIDGeneratorMock{},
 	}
 
-	server, err := createSCIMServer(cfg, uuidgenerator.UUIDGeneratorMock{})
+	server, err := createSCIMServer(cfg)
 	require.NoError(suite.T(), err)
 
 	suite.server = server
