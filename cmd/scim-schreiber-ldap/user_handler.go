@@ -237,7 +237,14 @@ func (h UserHandler) Patch(r *http.Request, id string, operations []scim.PatchOp
 
 	slog.Info("Updating user details.", "uid", entry.GetAttributeValue("uid"))
 
-	replaces := h.resourceToLdap(attributes)
+	replaces := filterChanged(h.resourceToLdap(attributes), entry)
+
+	if len(replaces) == 0 {
+		slog.Info("No changes.")
+		return ldapEntryToUserResource(entry), nil
+	}
+
+	slog.Info("Updating user details.", "replaces", replaces)
 
 	err := ldapCtx.UpdateEntry(entry.DN, nil, nil, replaces)
 
@@ -252,6 +259,17 @@ func (h UserHandler) Patch(r *http.Request, id string, operations []scim.PatchOp
 	return ldapEntryToUserResource(entry), nil
 }
 
+func filterChanged(replaces map[string][]string, entry *ldap.Entry) map[string][]string {
+	cleaned_replaces := make(map[string][]string, len(replaces))
+
+	for attributeName, attributeValue := range replaces {
+		if !slices.Equal(entry.GetAttributeValues(attributeName), attributeValue) {
+			cleaned_replaces[attributeName] = attributeValue
+		}
+	}
+	return cleaned_replaces
+}
+
 func (h UserHandler) resourceToLdap(attributes map[string]interface{}) map[string][]string {
 	s := scimMailToLdap(attributes)
 
@@ -263,7 +281,7 @@ func (h UserHandler) resourceToLdap(attributes map[string]interface{}) map[strin
 	}
 
 	replaces := map[string][]string{
-		"isActive":     {strconv.FormatBool(attributes["active"].(bool))},
+		"isActive":     {LdapBoolToString(attributes["active"].(bool))},
 		"cn":           {name["formatted"].(string)},
 		"givenName":    {name["givenName"].(string)},
 		"title":        getOptionalAttribute(attributes, "title"),

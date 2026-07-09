@@ -12,3 +12,11 @@ func CastMultiValue[T any](input interface{}) []T {
 	}
 	return out
 }
+
+func LdapBoolToString(val bool) string {
+	if val {
+		return "TRUE"
+	}
+
+	return "FALSE"
+}
