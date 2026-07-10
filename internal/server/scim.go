@@ -6,8 +6,7 @@ import (
 
 	"github.com/elimity-com/scim"
 	"github.com/elimity-com/scim/optional"
-
-	"github.com/josegomezr/scim-schreiber-ldap/internal/model"
+	"github.com/elimity-com/scim/schema"
 )
 
 const (
@@ -44,15 +43,25 @@ func NewSCIMServer(userHandler scim.ResourceHandler, groupHandler scim.ResourceH
 			Name:        "User",
 			Endpoint:    "/Users",
 			Description: optional.NewString("User Account"),
-			Schema:      model.UserSchema,
-			Handler:     userHandler,
+			Schema:      schema.CoreUserSchema(),
+			SchemaExtensions: []scim.SchemaExtension{
+				{
+					Schema:   schema.ExtensionEnterpriseUser(),
+					Required: false,
+				},
+				{
+					Schema:   SchemaExtensionSUSEUser,
+					Required: false,
+				},
+			},
+			Handler: userHandler,
 		},
 		{
 			ID:          optional.NewString("Group"),
 			Name:        "Group",
 			Endpoint:    "/Groups",
 			Description: optional.NewString("Groups"),
-			Schema:      model.GroupSchema,
+			Schema:      schema.CoreGroupSchema(),
 			Handler:     groupHandler,
 		},
 	}

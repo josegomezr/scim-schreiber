@@ -18,6 +18,9 @@ func StartHttpServer(server scim.Server, middlewares ...Middleware) {
 	mux.Handle("/", server)
 
 	var handler http.Handler = mux
+
+	handler = FlattenPatchMiddleware(handler)
+
 	for _, middleware := range middlewares {
 		handler = middleware(handler)
 	}
@@ -25,7 +28,7 @@ func StartHttpServer(server scim.Server, middlewares ...Middleware) {
 	listenAddr := ":9440"
 	slog.Info("Listening", "listenAddr", listenAddr)
 	// TODO(josegomezr): configurable ports here
-	err := http.ListenAndServe(listenAddr, mux)
+	err := http.ListenAndServe(listenAddr, handler)
 
 	if err != nil {
 		slog.Error("Failed to start http server", "err", err)

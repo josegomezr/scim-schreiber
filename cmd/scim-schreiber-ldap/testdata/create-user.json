@@ -1,6 +1,4 @@
 {
-  "communityUid": "josegomezr",
-  "employeeNumber": "76003026",
   "name": {
     "givenName": "Jose",
     "familyName": "Gomez",
@@ -16,7 +14,15 @@
     }
   ],
   "schemas": [
-    "urn:ietf:params:scim:schemas:core:2.0:User"
+    "urn:ietf:params:scim:schemas:core:2.0:User",
+    "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User",
+    "urn:ietf:params:scim:schemas:extension:suse:2.0:User"
   ],
+  "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User": {
+    "employeeNumber": "76003026"
+  },
+  "urn:ietf:params:scim:schemas:extension:suse:2.0:User": {
+    "communityUid": "josegomezr"
+  },
   "userName": "jgomez"
 }
