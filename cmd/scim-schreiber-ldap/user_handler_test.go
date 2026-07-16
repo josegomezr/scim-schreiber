@@ -103,6 +103,51 @@ func (suite *SCIMUserTestSuite) TearDownSuite() {
 	}
 }
 
+// TODO Use table tests
+func (suite *SCIMUserTestSuite) TestCreateUserNoName() {
+	t := suite.T()
+
+	file, err := os.Open(filepath.Join(".", "testdata", "create-user-noname.json"))
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, file.Close())
+	})
+
+	request, _ := http.NewRequest(http.MethodPost, "/Users", file)
+	ctx := WithLDAPContext(request.Context(), suite.ldapCtx)
+	request = request.WithContext(ctx)
+
+	response := httptest.NewRecorder()
+	suite.server.ServeHTTP(response, request)
+
+	assert.Equal(t, http.StatusCreated, response.Code)
+	got := response.Body.String()
+	want := `
+{
+  "name": {
+    "givenName": null,
+    "familyName": null,
+    "formatted": null
+  },
+  "externalId": "uid=noname,ou=people,dc=suse,dc=com",
+  "active": true,
+  "emails": [
+    {
+      "primary": true,
+      "type": "work",
+      "value": "noname@suse.com"
+    }
+  ],
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+  ],
+  "userName": "noname"
+}
+    `
+
+	assert.JSONEq(t, want, got)
+}
+
 func (suite *SCIMUserTestSuite) TestCreateUser() {
 	t := suite.T()
 

@@ -302,7 +302,6 @@ func (h UserHandler) resourceToLdap(attributes map[string]interface{}) map[strin
 	replaces := map[string][]string{
 		"isActive":     {LdapBoolToString(attributes["active"].(bool))},
 		"cn":           {name["formatted"].(string)},
-		"givenName":    {name["givenName"].(string)},
 		"title":        getOptionalAttribute(attributes, "title"),
 		"o":            organization,
 		"sn":           {name["familyName"].(string)},
@@ -314,6 +313,13 @@ func (h UserHandler) resourceToLdap(attributes map[string]interface{}) map[strin
 		"postalCode": getOptionalAttribute(address, "postalCode"),
 		"c":          getOptionalAttribute(address, "country"),
 		"st":         getOptionalAttribute(address, "region"),
+	}
+
+	givenName, ok := name["givenName"]
+
+	// Can be empty for community users
+	if ok && givenName != "" {
+		replaces["givenName"] = []string{givenName.(string)}
 	}
 
 	if telephones, ok := attributes["phoneNumbers"]; ok {

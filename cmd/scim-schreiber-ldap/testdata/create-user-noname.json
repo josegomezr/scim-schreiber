@@ -1,0 +1,20 @@
+{
+  "name": {
+    "givenName": null,
+    "familyName": "lastName",
+    "formatted": "formatted"
+  },
+  "externalId": "uid=noname,ou=people,dc=suse,dc=com",
+  "active": true,
+  "emails": [
+    {
+      "primary": true,
+      "type": "work",
+      "value": "noname@suse.com"
+    }
+  ],
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+  ],
+  "userName": "noname"
+}
