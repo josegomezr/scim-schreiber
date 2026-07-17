@@ -20,7 +20,7 @@ func main() {
 	slog.SetDefault(server.GetLogger())
 
 	cfg := Config{
-		AllowUserCreation:     false,
+		AllowUserCreation:     true,
 		GroupCreationIsUpsert: true,
 		UUIDGenerator:         uuidgenerator.UUIDGeneratorImpl{},
 	}

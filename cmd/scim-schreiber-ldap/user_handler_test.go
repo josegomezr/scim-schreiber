@@ -85,12 +85,13 @@ func (suite *SCIMUserTestSuite) BeforeTest(suiteName, testName string) {
 }
 
 func (suite *SCIMUserTestSuite) AfterTest(suiteName, testName string) {
-	dn := fmt.Sprintf("uid=%s,%s,%s", "test", suite.ldapCtx.baseUserOu, suite.ldapCtx.baseDn)
-	err := suite.ldapCtx.Delete(dn)
-	require.NoError(suite.T(), err)
-	dn = fmt.Sprintf("uid=%s,%s,%s", "jgomez", suite.ldapCtx.baseUserOu, suite.ldapCtx.baseDn)
-	err = suite.ldapCtx.Delete(dn)
-	require.NoError(suite.T(), err)
+	for _, user := range []string{
+		"test", "jgomez", "noname",
+	} {
+		dn := fmt.Sprintf("uid=%s,%s,%s", user, suite.ldapCtx.baseUserOu, suite.ldapCtx.baseDn)
+		err := suite.ldapCtx.Delete(dn)
+		require.NoError(suite.T(), err)
+	}
 }
 
 func (suite *SCIMUserTestSuite) TearDownSuite() {
@@ -101,6 +102,57 @@ func (suite *SCIMUserTestSuite) TearDownSuite() {
 	if err := suite.ldapContainer.Terminate(suite.ctx); err != nil {
 		log.Fatalf("error terminating postgres container: %s", err)
 	}
+}
+
+// TODO Use table tests
+func (suite *SCIMUserTestSuite) TestCreateUserNoName() {
+	t := suite.T()
+
+	file, err := os.Open(filepath.Join(".", "testdata", "create-user-noname.json"))
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, file.Close())
+	})
+
+	request, _ := http.NewRequest(http.MethodPost, "/Users", file)
+	ctx := WithLDAPContext(request.Context(), suite.ldapCtx)
+	request = request.WithContext(ctx)
+
+	response := httptest.NewRecorder()
+	suite.server.ServeHTTP(response, request)
+
+	assert.Equal(t, http.StatusCreated, response.Code)
+	got := response.Body.String()
+	want := `
+{
+  "id": "noname",
+  "name": {
+    "familyName": "lastName",
+    "formatted": "formatted"
+  },
+  "externalId": "uid=noname,ou=people,dc=suse,dc=com",
+  "active": true,
+  "emails": [
+    {
+      "primary": true,
+      "type": "work",
+      "value": "noname@suse.com"
+    }
+  ],
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User",
+    "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User", 
+    "urn:ietf:params:scim:schemas:extension:suse:2.0:User"
+  ],
+  "userName": "noname",
+  "meta": {
+    "location": "Users/noname",
+    "resourceType": "User"
+  }
+}
+    `
+
+	assert.JSONEq(t, want, got)
 }
 
 func (suite *SCIMUserTestSuite) TestCreateUser() {
@@ -142,6 +194,10 @@ func (suite *SCIMUserTestSuite) TestCreateUser() {
     "givenName": "Jose",
     "familyName": "Gomez",
     "formatted":"José Gómez"
+  },
+  "urn:ietf:params:scim:schemas:extension:suse:2.0:User": {
+    "communityUid": "josegomezr",
+    "sshPublicKey": ["test-ssh-key"]
   },
   "schemas": [
     "urn:ietf:params:scim:schemas:core:2.0:User",

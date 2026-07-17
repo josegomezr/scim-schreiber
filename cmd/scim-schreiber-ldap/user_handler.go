@@ -11,9 +11,9 @@ import (
 	"github.com/elimity-com/scim/errors"
 	"github.com/elimity-com/scim/optional"
 	"github.com/go-ldap/ldap/v3"
+	"github.com/josegomezr/scim-schreiber-ldap/internal/utils"
 	scim_filter_parser "github.com/scim2/filter-parser/v2"
 
-	"github.com/josegomezr/scim-schreiber-ldap/internal/utils"
 	"github.com/josegomezr/scim-schreiber-ldap/internal/uuidgenerator"
 )
 
@@ -52,7 +52,7 @@ func (h UserHandler) Create(r *http.Request, attributes scim.ResourceAttributes)
 		}
 	}
 
-	ldapAttributes := h.resourceToLdap(utils.FlattenAttrs(attributes))
+	ldapAttributes := h.resourceToLdap(attributes)
 	externalId := attributes["externalId"].(string)
 
 	ldapAttributes["employeeNumber"] = []string{"-1"}
@@ -271,50 +271,27 @@ func filterChanged(replaces map[string][]string, entry *ldap.Entry) map[string][
 	return cleaned_replaces
 }
 
-func (h UserHandler) resourceToLdap(attributes map[string]interface{}) map[string][]string {
-	s := scimMailToLdap(attributes)
+type Phones struct {
+	work   string
+	mobile string
+}
 
-	name := attributes["name"].(map[string]interface{})
-
-	address := map[string]interface{}{}
-	if addresses, ok := attributes["addresses"]; ok && len(addresses.([]interface{})) > 0 {
-		address = addresses.([]interface{})[0].(map[string]interface{})
+func (p Phones) workLdap() []string {
+	if p.work != "" {
+		return []string{p.work}
 	}
+	return []string{}
+}
 
-	var organization []string
-	if ext, ok := attributes["urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"].(map[string]interface{}); ok {
-		organization = getOptionalAttribute(ext, "organization")
-	} else if orgAttr, ok := attributes["urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:organization"]; ok {
-		organization = []string{orgAttr.(string)}
+func (p Phones) mobileLdap() []string {
+	if p.mobile != "" {
+		return []string{p.mobile}
 	}
+	return []string{}
+}
 
-	var sshPublicKey []string
-	if ext, ok := attributes["urn:ietf:params:scim:schemas:extension:suse:2.0:User"].(map[string]interface{}); ok {
-		sshPublicKey = getOptionalAttributeSlice(ext, "sshPublicKey", []string{})
-	} else if sshAttr, ok := attributes["urn:ietf:params:scim:schemas:extension:suse:2.0:User:sshPublicKey"]; ok {
-		if slice, ok := sshAttr.([]interface{}); ok {
-			for _, v := range slice {
-				sshPublicKey = append(sshPublicKey, v.(string))
-			}
-		}
-	}
-
-	replaces := map[string][]string{
-		"isActive":     {LdapBoolToString(attributes["active"].(bool))},
-		"cn":           {name["formatted"].(string)},
-		"givenName":    {name["givenName"].(string)},
-		"title":        getOptionalAttribute(attributes, "title"),
-		"o":            organization,
-		"sn":           {name["familyName"].(string)},
-		"sshPublicKey": sshPublicKey,
-		"mail":         s,
-		// Address
-		"street":     getOptionalAttribute(address, "streetAddress"),
-		"l":          getOptionalAttribute(address, "locality"),
-		"postalCode": getOptionalAttribute(address, "postalCode"),
-		"c":          getOptionalAttribute(address, "country"),
-		"st":         getOptionalAttribute(address, "region"),
-	}
+func getPhones(attributes map[string]interface{}) Phones {
+	phones := Phones{}
 
 	if telephones, ok := attributes["phoneNumbers"]; ok {
 		for _, phone := range telephones.([]interface{}) {
@@ -329,15 +306,54 @@ func (h UserHandler) resourceToLdap(attributes map[string]interface{}) map[strin
 			}
 			switch phoneType {
 			case "work":
-				replaces["telephoneNumber"] = []string{phoneNr}
+				phones.work = phoneNr
 				break
 			case "mobile":
-				replaces["mobile"] = []string{phoneNr}
+				phones.mobile = phoneNr
 				break
 			}
 		}
 	}
-	return replaces
+
+	return phones
+}
+
+func (h UserHandler) resourceToLdap(attributes map[string]interface{}) map[string][]string {
+	s := scimMailToLdap(attributes)
+
+	name := attributes["name"].(map[string]interface{})
+
+	address := map[string]interface{}{}
+	if addresses, ok := attributes["addresses"]; ok && len(addresses.([]interface{})) > 0 {
+		address = addresses.([]interface{})[0].(map[string]interface{})
+	}
+
+	organization := utils.GetOptionalExtensionAttributeValue(attributes, "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User", "organization")
+	sshKeys := utils.GetOptionalExtensionAttributeValues(attributes, "urn:ietf:params:scim:schemas:extension:suse:2.0:User", "sshPublicKey")
+	communityUid := utils.GetOptionalExtensionAttributeValue(attributes, "urn:ietf:params:scim:schemas:extension:suse:2.0:User", "communityUid")
+
+	phones := getPhones(attributes)
+
+	// avoid appending this dynamically. Every field should always be defined so that removals work too.
+	return map[string][]string{
+		"isActive":     {LdapBoolToString(attributes["active"].(bool))},
+		"cn":           {name["formatted"].(string)},
+		"title":        utils.GetOptionalAttribute(attributes, "title"),
+		"o":            organization,
+		"givenName":    utils.GetOptionalAttribute(name, "givenName"), // Can be empty for community users
+		"sn":           {name["familyName"].(string)},
+		"sshPublicKey": sshKeys,
+		"mail":         s,
+		// Address
+		"street":          utils.GetOptionalAttribute(address, "streetAddress"),
+		"l":               utils.GetOptionalAttribute(address, "locality"),
+		"postalCode":      utils.GetOptionalAttribute(address, "postalCode"),
+		"c":               utils.GetOptionalAttribute(address, "country"),
+		"st":              utils.GetOptionalAttribute(address, "region"),
+		"communityUid":    communityUid,
+		"telephoneNumber": phones.workLdap(),
+		"mobile":          phones.mobileLdap(),
+	}
 }
 
 func (h UserHandler) Replace(r *http.Request, id string, attributes scim.ResourceAttributes) (scim.Resource, error) {
@@ -373,34 +389,6 @@ func scimMailToLdap(attributes scim.ResourceAttributes) []string {
 	return result
 }
 
-func getOptionalAttributeSlice[T any](attributes scim.ResourceAttributes, name string, fallback []T) []T {
-	value, ok := attributes[name]
-
-	if !ok {
-		return fallback
-	}
-
-	list := value.([]interface{})
-
-	result := make([]T, 0, len(list))
-
-	for _, entry := range list {
-		result = append(result, entry.(T))
-	}
-
-	return result
-}
-
-func getOptionalAttribute(attributes scim.ResourceAttributes, name string) []string {
-	value, ok := attributes[name]
-
-	if !ok {
-		return []string{}
-	}
-
-	return []string{value.(string)}
-}
-
 func ldapMailToSCIMMail(entry *ldap.Entry) []interface{} {
 	ldapMails := entry.GetAttributeValues("mail")
 	result := make([]interface{}, 0, len(ldapMails))
@@ -418,8 +406,11 @@ func ldapEntryToUserResource(entry *ldap.Entry) scim.Resource {
 
 	name := map[string]interface{}{
 		"familyName": entry.GetAttributeValue("sn"),
-		"givenName":  entry.GetAttributeValue("givenName"),
 		"formatted":  entry.GetAttributeValue("cn"),
+	}
+
+	if givenName, ok := optionalAttribute(entry, "givenName"); ok {
+		name["givenName"] = givenName
 	}
 
 	active, err := strconv.ParseBool(entry.GetAttributeValue("isActive"))
@@ -448,11 +439,18 @@ func ldapEntryToUserResource(entry *ldap.Entry) scim.Resource {
 		attributes["phoneNumbers"] = phoneNumbers
 	}
 
+	suseExtension := map[string]interface{}{}
 	sshPubKeys := entry.GetAttributeValues("sshPublicKey")
 	if len(sshPubKeys) > 0 {
-		attributes["urn:ietf:params:scim:schemas:extension:suse:2.0:User"] = map[string]interface{}{
-			"sshPublicKey": sshPubKeys,
-		}
+		suseExtension["sshPublicKey"] = sshPubKeys
+	}
+
+	if communityUid, ok := optionalAttribute(entry, "communityUid"); ok {
+		suseExtension["communityUid"] = communityUid
+	}
+
+	if len(suseExtension) > 0 {
+		attributes["urn:ietf:params:scim:schemas:extension:suse:2.0:User"] = suseExtension
 	}
 
 	organization := entry.GetAttributeValues("o")

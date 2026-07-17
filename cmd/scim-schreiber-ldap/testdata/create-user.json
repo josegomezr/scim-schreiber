@@ -22,7 +22,8 @@
     "employeeNumber": "76003026"
   },
   "urn:ietf:params:scim:schemas:extension:suse:2.0:User": {
-    "communityUid": "josegomezr"
+    "communityUid": "josegomezr",
+    "sshPublicKey": ["test-ssh-key"]
   },
   "userName": "jgomez"
 }
