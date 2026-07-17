@@ -85,12 +85,13 @@ func (suite *SCIMUserTestSuite) BeforeTest(suiteName, testName string) {
 }
 
 func (suite *SCIMUserTestSuite) AfterTest(suiteName, testName string) {
-	dn := fmt.Sprintf("uid=%s,%s,%s", "test", suite.ldapCtx.baseUserOu, suite.ldapCtx.baseDn)
-	err := suite.ldapCtx.Delete(dn)
-	require.NoError(suite.T(), err)
-	dn = fmt.Sprintf("uid=%s,%s,%s", "jgomez", suite.ldapCtx.baseUserOu, suite.ldapCtx.baseDn)
-	err = suite.ldapCtx.Delete(dn)
-	require.NoError(suite.T(), err)
+	for _, user := range []string{
+		"test", "jgomez", "noname",
+	} {
+		dn := fmt.Sprintf("uid=%s,%s,%s", user, suite.ldapCtx.baseUserOu, suite.ldapCtx.baseDn)
+		err := suite.ldapCtx.Delete(dn)
+		require.NoError(suite.T(), err)
+	}
 }
 
 func (suite *SCIMUserTestSuite) TearDownSuite() {
@@ -124,10 +125,10 @@ func (suite *SCIMUserTestSuite) TestCreateUserNoName() {
 	got := response.Body.String()
 	want := `
 {
+  "id": "noname",
   "name": {
-    "givenName": null,
-    "familyName": null,
-    "formatted": null
+    "familyName": "lastName",
+    "formatted": "formatted"
   },
   "externalId": "uid=noname,ou=people,dc=suse,dc=com",
   "active": true,
@@ -139,9 +140,15 @@ func (suite *SCIMUserTestSuite) TestCreateUserNoName() {
     }
   ],
   "schemas": [
-    "urn:ietf:params:scim:schemas:core:2.0:User"
+    "urn:ietf:params:scim:schemas:core:2.0:User",
+    "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User", 
+    "urn:ietf:params:scim:schemas:extension:suse:2.0:User"
   ],
-  "userName": "noname"
+  "userName": "noname",
+  "meta": {
+    "location": "Users/noname",
+    "resourceType": "User"
+  }
 }
     `
 
@@ -187,6 +194,10 @@ func (suite *SCIMUserTestSuite) TestCreateUser() {
     "givenName": "Jose",
     "familyName": "Gomez",
     "formatted":"José Gómez"
+  },
+  "urn:ietf:params:scim:schemas:extension:suse:2.0:User": {
+    "communityUid": "josegomezr",
+    "sshPublicKey": ["test-ssh-key"]
   },
   "schemas": [
     "urn:ietf:params:scim:schemas:core:2.0:User",
