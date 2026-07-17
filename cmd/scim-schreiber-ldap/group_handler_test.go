@@ -20,7 +20,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/josegomezr/scim-schreiber-ldap/cmd/scim-schreiber-ldap/testhelpers"
-	"github.com/josegomezr/scim-schreiber-ldap/internal/uuidgenerator"
 )
 
 const (
@@ -50,7 +49,7 @@ func (suite *SCIMGroupTestSuite) SetupSuite() {
 		GroupCreationIsUpsert: true,
 	}
 
-	server, err := createSCIMServer(cfg, uuidgenerator.UUIDGeneratorMock{})
+	server, err := createSCIMServer(cfg)
 	require.NoError(suite.T(), err)
 
 	suite.server = server
@@ -193,7 +192,7 @@ func (suite *SCIMGroupTestSuite) TestPatch() {
 					"resourceType" : "Group",
 					"location" : "Groups/group-fullReplace"
 				  },
-				  "schemas" : [ "urn:ietf:params:model:schemas:core:2.0:Group" ]
+				  "schemas" : [ "urn:ietf:params:scim:schemas:core:2.0:Group" ]
 				}
 			`,
 		},
@@ -224,7 +223,7 @@ func (suite *SCIMGroupTestSuite) TestPatch() {
 					"resourceType" : "Group",
 					"location" : "Groups/group-pathReplace"
 				  },
-				  "schemas" : [ "urn:ietf:params:model:schemas:core:2.0:Group" ]
+				  "schemas" : [ "urn:ietf:params:scim:schemas:core:2.0:Group" ]
 				}
 			`,
 		},
@@ -260,11 +259,11 @@ func (suite *SCIMGroupTestSuite) TestPatch() {
 					  "value": "test"
 					}
 				  ],
-		  		  "meta" : {
-		  			"resourceType" : "Group",
-		  			"location" : "Groups/group-addMember"
-		  		  },
-		  		  "schemas" : [ "urn:ietf:params:model:schemas:core:2.0:Group" ]
+				  "meta" : {
+					"resourceType" : "Group",
+					"location" : "Groups/group-addMember"
+				  },
+				"schemas" : [ "urn:ietf:params:scim:schemas:core:2.0:Group" ]
 		  		}
 		  	`,
 		},
@@ -297,7 +296,7 @@ func (suite *SCIMGroupTestSuite) TestPatch() {
 					"location": "Groups/group-addMemberPathStyle"
 				  },
 				  "schemas": [
-					"urn:ietf:params:model:schemas:core:2.0:Group"
+					"urn:ietf:params:scim:schemas:core:2.0:Group"
 				  ]
 				}
 			`,
@@ -370,7 +369,7 @@ func (suite *SCIMGroupTestSuite) TestGetGroup() {
 			"location": "Groups/testGroupId"
 		  },
 		  "schemas": [
-			"urn:ietf:params:model:schemas:core:2.0:Group"
+			"urn:ietf:params:scim:schemas:core:2.0:Group"
 		  ]
 		}
     `
@@ -403,7 +402,7 @@ func (suite *SCIMGroupTestSuite) TestList() {
 					"location": "Groups/testGroupId"
 				  },
 				  "schemas": [
-					"urn:ietf:params:model:schemas:core:2.0:Group"
+					"urn:ietf:params:scim:schemas:core:2.0:Group"
 				  ]
 				}
 			  ],
@@ -469,7 +468,7 @@ func (suite *SCIMGroupTestSuite) TestFilter() {
 				"location": "Groups/testGroupId"
 			  },
 			  "schemas": [
-				"urn:ietf:params:model:schemas:core:2.0:Group"
+				"urn:ietf:params:scim:schemas:core:2.0:Group"
 			  ]
 			}
 		  ],

@@ -14,13 +14,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/elimity-com/scim"
 	"github.com/go-ldap/ldap/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/josegomezr/scim-schreiber-ldap/cmd/scim-schreiber-ldap/testhelpers"
+	"github.com/josegomezr/scim-schreiber-ldap/internal/server"
 	"github.com/josegomezr/scim-schreiber-ldap/internal/uuidgenerator"
 )
 
@@ -32,7 +32,7 @@ type SCIMUserTestSuite struct {
 	suite.Suite
 	ldapContainer *testhelpers.LdapContainer
 	ctx           context.Context
-	server        scim.Server
+	server        http.Handler
 	ldapCtx       LdapUtil
 }
 
@@ -49,12 +49,13 @@ func (suite *SCIMUserTestSuite) SetupSuite() {
 	cfg := Config{
 		AllowUserCreation:     true,
 		GroupCreationIsUpsert: true,
+		UUIDGenerator:         uuidgenerator.UUIDGeneratorMock{},
 	}
 
-	server, err := createSCIMServer(cfg, uuidgenerator.UUIDGeneratorMock{})
+	s, err := createSCIMServer(cfg)
 	require.NoError(suite.T(), err)
 
-	suite.server = server
+	suite.server = server.FlattenPatchMiddleware(s)
 
 	ldapUtil := LdapUtil{
 		endpoint:    endpoint,
@@ -143,7 +144,9 @@ func (suite *SCIMUserTestSuite) TestCreateUser() {
     "formatted":"José Gómez"
   },
   "schemas": [
-    "urn:ietf:params:model:schemas:core:2.0:User"
+    "urn:ietf:params:scim:schemas:core:2.0:User",
+    "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User",
+    "urn:ietf:params:scim:schemas:extension:suse:2.0:User"
   ]
 }
     `
@@ -221,8 +224,6 @@ func (suite *SCIMUserTestSuite) TestPatchUser() {
             { "type": "work", "primary": false, "value": "secondary@suse.com" }
           ],
           "title": "Test Engineer",
-		  "sshPublicKey": ["test-ssh-key"],
-          "organization": "SUSE",
 		  "addresses": [
 			{
 			  "streetAddress": "Streetname 1",
@@ -241,10 +242,18 @@ func (suite *SCIMUserTestSuite) TestPatchUser() {
 			  "type": "work",
 			  "value": "+1 456"
 			}
-		  ],
-          "schemas": [
-            "urn:ietf:params:model:schemas:core:2.0:User"
-          ],
+		],
+	"schemas" : [
+	"urn:ietf:params:scim:schemas:core:2.0:User",
+	"urn:ietf:params:scim:schemas:extension:enterprise:2.0:User",
+	"urn:ietf:params:scim:schemas:extension:suse:2.0:User"
+	],
+	"urn:ietf:params:scim:schemas:extension:enterprise:2.0:User": {
+		"organization": "SUSE"
+	},
+	"urn:ietf:params:scim:schemas:extension:suse:2.0:User": {
+		"sshPublicKey": ["test-ssh-key"]
+	},
           "userName": "test"
         }
     `
@@ -284,7 +293,11 @@ func (suite *SCIMUserTestSuite) TestGetUser() {
 	got := response.Body.String()
 	want := `
      {
-       "schemas": [ "urn:ietf:params:model:schemas:core:2.0:User" ],
+	"schemas" : [
+		"urn:ietf:params:scim:schemas:core:2.0:User",
+		"urn:ietf:params:scim:schemas:extension:enterprise:2.0:User",
+		"urn:ietf:params:scim:schemas:extension:suse:2.0:User"
+	],
        "externalId":"uid=test,ou=people,dc=suse,dc=com",
        "id":"test",
   	   "active": true,
@@ -326,7 +339,11 @@ func (suite *SCIMUserTestSuite) TestGetAllUsers() {
       "resourceType" : "User",
       "location" : "Users/test"
     },
-    "schemas" : [ "urn:ietf:params:model:schemas:core:2.0:User" ]
+	"schemas" : [
+		"urn:ietf:params:scim:schemas:core:2.0:User",
+		"urn:ietf:params:scim:schemas:extension:enterprise:2.0:User",
+		"urn:ietf:params:scim:schemas:extension:suse:2.0:User"
+	]
   } ],
   "itemsPerPage" : 100,
   "schemas" : [ "urn:ietf:params:scim:api:messages:2.0:ListResponse" ],
@@ -388,7 +405,11 @@ func (suite *SCIMUserTestSuite) TestFilterUsers() {
       "resourceType" : "User",
       "location" : "Users/test"
     },
-    "schemas" : [ "urn:ietf:params:model:schemas:core:2.0:User" ]
+	"schemas" : [
+		"urn:ietf:params:scim:schemas:core:2.0:User",
+		"urn:ietf:params:scim:schemas:extension:enterprise:2.0:User",
+		"urn:ietf:params:scim:schemas:extension:suse:2.0:User"
+	]
   } ],
   "itemsPerPage" : 100,
   "schemas" : [ "urn:ietf:params:scim:api:messages:2.0:ListResponse" ],

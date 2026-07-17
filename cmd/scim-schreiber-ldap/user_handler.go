@@ -13,6 +13,7 @@ import (
 	"github.com/go-ldap/ldap/v3"
 	scim_filter_parser "github.com/scim2/filter-parser/v2"
 
+	"github.com/josegomezr/scim-schreiber-ldap/internal/utils"
 	"github.com/josegomezr/scim-schreiber-ldap/internal/uuidgenerator"
 )
 
@@ -51,7 +52,7 @@ func (h UserHandler) Create(r *http.Request, attributes scim.ResourceAttributes)
 		}
 	}
 
-	ldapAttributes := h.resourceToLdap(attributes)
+	ldapAttributes := h.resourceToLdap(utils.FlattenAttrs(attributes))
 	externalId := attributes["externalId"].(string)
 
 	ldapAttributes["employeeNumber"] = []string{"-1"}
@@ -280,14 +281,32 @@ func (h UserHandler) resourceToLdap(attributes map[string]interface{}) map[strin
 		address = addresses.([]interface{})[0].(map[string]interface{})
 	}
 
+	var organization []string
+	if ext, ok := attributes["urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"].(map[string]interface{}); ok {
+		organization = getOptionalAttribute(ext, "organization")
+	} else if orgAttr, ok := attributes["urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:organization"]; ok {
+		organization = []string{orgAttr.(string)}
+	}
+
+	var sshPublicKey []string
+	if ext, ok := attributes["urn:ietf:params:scim:schemas:extension:suse:2.0:User"].(map[string]interface{}); ok {
+		sshPublicKey = getOptionalAttributeSlice(ext, "sshPublicKey", []string{})
+	} else if sshAttr, ok := attributes["urn:ietf:params:scim:schemas:extension:suse:2.0:User:sshPublicKey"]; ok {
+		if slice, ok := sshAttr.([]interface{}); ok {
+			for _, v := range slice {
+				sshPublicKey = append(sshPublicKey, v.(string))
+			}
+		}
+	}
+
 	replaces := map[string][]string{
 		"isActive":     {LdapBoolToString(attributes["active"].(bool))},
 		"cn":           {name["formatted"].(string)},
 		"givenName":    {name["givenName"].(string)},
 		"title":        getOptionalAttribute(attributes, "title"),
-		"o":            getOptionalAttribute(attributes, "organization"),
+		"o":            organization,
 		"sn":           {name["familyName"].(string)},
-		"sshPublicKey": getOptionalAttributeSlice(attributes, "sshPublicKey", []string{}),
+		"sshPublicKey": sshPublicKey,
 		"mail":         s,
 		// Address
 		"street":     getOptionalAttribute(address, "streetAddress"),
@@ -431,11 +450,19 @@ func ldapEntryToUserResource(entry *ldap.Entry) scim.Resource {
 
 	sshPubKeys := entry.GetAttributeValues("sshPublicKey")
 	if len(sshPubKeys) > 0 {
-		attributes["sshPublicKey"] = sshPubKeys
+		attributes["urn:ietf:params:scim:schemas:extension:suse:2.0:User"] = map[string]interface{}{
+			"sshPublicKey": sshPubKeys,
+		}
+	}
+
+	organization := entry.GetAttributeValues("o")
+	if len(organization) == 1 { // single value
+		attributes["urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"] = map[string]interface{}{
+			"organization": organization[0],
+		}
 	}
 
 	optionalAttributeToResource(entry, attributes, "title", "title")
-	optionalAttributeToResource(entry, attributes, "o", "organization")
 
 	return scim.Resource{
 		// This is the ID that will then be used to manage group memberships.

@@ -6,8 +6,6 @@
   },
   "active": false,
   "title": "Test Engineer",
-  "organization": "SUSE",
-  "sshPublicKey": ["test-ssh-key"],
   "externalId": "uid=test,ou=people,dc=suse,dc=com",
   "addresses": [
     {
@@ -40,8 +38,11 @@
       "value": "primary@suse.com"
     }
   ],
-  "schemas": [
-    "urn:ietf:params:scim:schemas:core:2.0:User"
-  ],
+  "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User": {
+      "organization": "SUSE"
+  },
+  "urn:ietf:params:scim:schemas:extension:suse:2.0:User": {
+      "sshPublicKey": ["test-ssh-key"]
+  },
   "userName": "test"
 }
