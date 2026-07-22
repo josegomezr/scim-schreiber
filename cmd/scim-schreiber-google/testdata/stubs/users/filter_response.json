@@ -12,6 +12,11 @@
         "familyName": "Test",
         "fullName": "Felix Test"
       },
+      "customSchemas" : {
+        "User1921": {
+          "isSupervisor": false
+        }
+      },
       "isAdmin": false,
       "isDelegatedAdmin": false,
       "lastLoginTime": "2026-04-16T11:56:16.000Z",

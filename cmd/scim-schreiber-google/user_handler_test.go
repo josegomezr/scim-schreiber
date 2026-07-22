@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -83,6 +84,9 @@ func (suite *SCIMUserTestSuite) TestCreateUser() {
 	assert.Equal(t, http.StatusCreated, response.Code)
 }
 
+//go:embed testdata/expectations/users/replace-user.json
+var replaceUserExpectation string
+
 func (suite *SCIMUserTestSuite) TestReplaceUser() {
 	t := suite.T()
 
@@ -93,8 +97,9 @@ func (suite *SCIMUserTestSuite) TestReplaceUser() {
 	})
 
 	defer gock.Off()
+	gock.Observe(gock.DumpRequest)
 	suite.mockToken(t)
-	suite.mock(t, "https://admin.googleapis.com/admin/directory/v1/users/testuser@dev.suse.com", 200, "replace-user-response.json")
+	suite.mockWithRequestBody(t, "https://admin.googleapis.com/admin/directory/v1/users/testuser@dev.suse.com", 200, "replace-user-request.json", "replace-user-response.json")
 	suite.mockOk(t, "https://licensing.googleapis.com/apps/licensing/v1/product/Google-Apps/sku/1010020026/user/testuser@dev.suse.com", "get_license.json")
 
 	gock.New("https://licensing.googleapis.com").Delete("/apps/licensing/v1/product/Google-Apps/sku/1010020026/user/testuser@dev.suse.com").Reply(http.StatusNoContent)
@@ -106,35 +111,13 @@ func (suite *SCIMUserTestSuite) TestReplaceUser() {
 
 	assert.Equal(t, http.StatusOK, response.Code)
 	got := response.Body.String()
-	want := `
-			{
-			  "active" : true,
-			  "displayName" : "Display Test",
-			  "emails" : [ {
-				"primary" : true,
-				"type" : "work",
-				"value" : "testuser@dev.suse.com"
-			  }],
-			  "externalId" : "testuser@dev.suse.com",
-			  "id" : "100994131692123746646",
-			  "meta" : {
-				"resourceType" : "User",
-				"location" : "Users/100994131692123746646"
-			  },
-			  "name" : {
-				"familyName" : "User",
-				"formatted" : "Test User",
-				"givenName" : "Replace"
-			  },
-			  "entitlements": [],
-			  "orgUnitPath" : "/Authentik Staging",
-			  "schemas" : [ "urn:ietf:params:model:schemas:core:2.0:User" ],
-			  "userName" : "testuser@dev.suse.com"
-			}
-	    `
+	want := replaceUserExpectation
 
 	assert.JSONEq(t, want, got)
 }
+
+//go:embed testdata/expectations/users/patch-user.json
+var patchUserExpectation string
 
 func (suite *SCIMUserTestSuite) TestPatchUser() {
 	t := suite.T()
@@ -159,37 +142,7 @@ func (suite *SCIMUserTestSuite) TestPatchUser() {
 
 	assert.Equal(t, http.StatusOK, response.Code)
 	got := response.Body.String()
-	want := `
-			{
-			  "active" : true,
-			  "displayName" : "Display Test",
-			  "emails" : [ {
-				"primary" : true,
-				"type" : "work",
-				"value" : "testuser@dev.suse.com"
-			  }],
-			  "externalId" : "testuser@dev.suse.com",
-			  "id" : "100994131692123746646",
-			  "meta" : {
-				"resourceType" : "User",
-				"location" : "Users/100994131692123746646"
-			  },
-			  "name" : {
-				"familyName" : "User",
-				"formatted" : "Test User",
-				"givenName" : "Replace"
-			  },
-			  "entitlements": [
-                {
-					"value": "Google Workspace Enterprise Standard",
-					"type": "license"
-                }
-              ],
-			  "orgUnitPath" : "/Authentik Staging",
-			  "schemas" : [ "urn:ietf:params:model:schemas:core:2.0:User" ],
-			  "userName" : "testuser@dev.suse.com"
-			}
-	    `
+	want := patchUserExpectation
 
 	assert.JSONEq(t, want, got)
 }
@@ -233,44 +186,22 @@ func (suite *SCIMUserTestSuite) TestMissing() {
 	assert.Equal(t, http.StatusInternalServerError, response.Code)
 }
 
+//go:embed testdata/expectations/users/get-user.json
+var getUserExpectation string
+
 func (suite *SCIMUserTestSuite) TestGetUser() {
 	t := suite.T()
 
 	suite.mockToken(t)
 	suite.mockOk(t, "https://admin.googleapis.com/admin/directory/v1/users/104965396198408263080", "get_user.json")
-	suite.mockOk(t, "https://licensing.googleapis.com/apps/licensing/v1/product/Google-Apps/sku/1010020026/user/felix-test@dev.suse.com", "get_license.json")
+	suite.mockOk(t, "https://licensing.googleapis.com/apps/licensing/v1/product/Google-Apps/sku/1010020026/user/first.last@example.com", "get_license.json")
 
 	request, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("/Users/%s", testUserUUID), nil)
 	response := httptest.NewRecorder()
 	suite.server.ServeHTTP(response, request)
 
 	got := response.Body.String()
-	want := fmt.Sprintf(`
-     {
-       "schemas": [ "urn:ietf:params:model:schemas:core:2.0:User" ],
-       "externalId":"felix-test@dev.suse.com",
-       "id":"%[1]s",
-       "active": true,
-       "userName":"felix-test@dev.suse.com",
-       "displayName": "",
-       "name": {
-          "familyName":"Test", 
-          "formatted":"Felix Test", 
-          "givenName":"Felix"
-       },
-       "emails": [
-            { "type": "work", "primary": true, "value": "felix-test@dev.suse.com" }
-       ],
-       "orgUnitPath":"/Authentik Staging",
-	  "entitlements": [
-		{"type":"license", "value":"Google Workspace Enterprise Standard"}
-	  ],
-       "meta": {
-          "location": "Users/%[1]s",
-          "resourceType":"User"
-       }
-    }
-    `, testUserUUID)
+	want := getUserExpectation
 
 	assert.JSONEq(t, want, got)
 	assert.Equal(t, http.StatusOK, response.Code)
@@ -290,120 +221,63 @@ func (suite *SCIMUserTestSuite) mock(t *testing.T, url string, status int, respo
 	gock.New(url).Reply(status).Body(file)
 }
 
+func (suite *SCIMUserTestSuite) mockWithRequestBody(t *testing.T, url string, status int, requestFile string, responseFile string) {
+	stub, err := os.Open(filepath.Join(".", "testdata", "stubs", "users", responseFile))
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, stub.Close())
+	})
+
+	requestExpectation, err := os.Open(filepath.Join(".", "testdata", "expectations", "users", requestFile))
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, requestExpectation.Close())
+	})
+
+	gock.New(url).Body(requestExpectation).Reply(status).Body(stub)
+}
+
 func (suite *SCIMUserTestSuite) mockToken(t *testing.T) {
 	suite.mockOk(t, "https://oauth2.googleapis.com/token", "token.json")
 }
+
+//go:embed testdata/expectations/users/all-users.json
+var allUsersExpectation string
 
 func (suite *SCIMUserTestSuite) TestGetAllUsers() {
 	t := suite.T()
 
 	defer gock.Off()
 	suite.mockToken(t)
-	suite.mockOk(t, "https://admin.googleapis.com/admin/directory/v1/users", "all_users.json")
+	suite.mockOk(t, "https://admin.googleapis.com/admin/directory/v1/users?projection=full", "all_users.json")
 
 	request, _ := http.NewRequest(http.MethodGet, "/Users", nil)
 	response := httptest.NewRecorder()
 	suite.server.ServeHTTP(response, request)
 
 	got := response.Body.String()
-	want := `
-     {
-  "Resources" : [ 
-   {
-     "schemas": [ "urn:ietf:params:model:schemas:core:2.0:User" ],
-     "externalId":"svc_authentik@dev.suse.com",
-       "id":"113765969969838891919",
-       "active": true,
-       "userName":"svc_authentik@dev.suse.com",
-       "displayName": "",
-       "name": {
-          "familyName":"authentik", 
-          "formatted":"svc authentik", 
-          "givenName":"svc"
-       },
-       "emails": [
-            { "type": "work", "primary": true, "value": "svc_authentik@dev.suse.com" }
-       ],
-       "orgUnitPath":"/",
-       "meta": {
-          "location": "Users/113765969969838891919",
-          "resourceType":"User"
-       }
-   },
-   {
-    "schemas": [ "urn:ietf:params:model:schemas:core:2.0:User" ],
-     "externalId":"testokta@dev.suse.com",
-       "id":"104963533172021742203",
-       "active": false,
-       "userName":"testokta@dev.suse.com",
-       "displayName": "",
-       "name": {
-          "familyName":"Okta", 
-          "formatted":"Test Okta", 
-          "givenName":"Test"
-       },
-       "emails": [
-            { "type": "work", "primary": true, "value": "testokta@dev.suse.com" }
-       ],
-       "orgUnitPath":"/CW Limited Access",
-       "meta": {
-          "location": "Users/104963533172021742203",
-          "resourceType":"User"
-       }
-   }
-  ],
-  "itemsPerPage" : 100,
-  "schemas" : [ "urn:ietf:params:scim:api:messages:2.0:ListResponse" ],
-  "startIndex" : 1,
-  "totalResults" : 2
-}
-    `
+	want := allUsersExpectation
 
 	assert.JSONEq(t, want, got)
 	assert.Equal(t, http.StatusOK, response.Code)
 }
+
+//go:embed testdata/expectations/users/filter-users.json
+var filterUserExpectation string
 
 func (suite *SCIMUserTestSuite) TestFilterUsers() {
 	t := suite.T()
 
 	defer gock.Off()
 	suite.mockToken(t)
-	suite.mockOk(t, "https://admin.googleapis.com/admin/directory/v1/users?alt=json&domain=dev.suse.com&prettyPrint=false&query=email%3Dfelix-test%40dev.suse.com", "filter_response.json")
+	suite.mockOk(t, "https://admin.googleapis.com/admin/directory/v1/users?alt=json&domain=dev.suse.com&prettyPrint=false&query=email%3Dfelix-test%40dev.suse.com&projection=full", "filter_response.json")
 
 	request, _ := http.NewRequest(http.MethodGet, "/Users?filter="+url.QueryEscape("userName eq \"felix-test@dev.suse.com\""), nil)
 	response := httptest.NewRecorder()
 	suite.server.ServeHTTP(response, request)
 
 	got := response.Body.String()
-	want := `
-     {
-  "Resources" : [{
-       "schemas": [ "urn:ietf:params:model:schemas:core:2.0:User" ],
-       "externalId":"felix-test@dev.suse.com",
-       "id":"104965396198408263080",
-       "active": true,
-       "userName":"felix-test@dev.suse.com",
-       "displayName": "",
-       "name": {
-          "familyName":"Test", 
-          "formatted":"Felix Test", 
-          "givenName":"Felix"
-       },
-       "emails": [
-            { "type": "work", "primary": true, "value": "felix-test@dev.suse.com" }
-       ],
-       "orgUnitPath":"/Authentik Staging",
-       "meta": {
-          "location": "Users/104965396198408263080",
-          "resourceType":"User"
-       }
-  }],
-  "itemsPerPage" : 100,
-  "schemas" : [ "urn:ietf:params:scim:api:messages:2.0:ListResponse" ],
-  "startIndex" : 1,
-  "totalResults" : 1
-}
-    `
+	want := filterUserExpectation
 
 	assert.JSONEq(t, want, got)
 	assert.Equal(t, http.StatusOK, response.Code)

@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"crypto/rand"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"slices"
@@ -27,10 +30,10 @@ type UserHandler struct {
 	productInformation *ProductInformation
 }
 
-func (h UserHandler) Create(_ *http.Request, attributes scim.ResourceAttributes) (scim.Resource, error) {
+func (h UserHandler) Create(request *http.Request, attributes scim.ResourceAttributes) (scim.Resource, error) {
 	slog.Info("POST /v2/Users", "request", attributes)
 
-	userRequest, err := resourceToUser(attributes)
+	userRequest, err := resourceToUser(request, attributes)
 
 	if err != nil {
 		return scim.Resource{}, err
@@ -77,7 +80,7 @@ func (h UserHandler) Get(_ *http.Request, id string) (scim.Resource, error) {
 		return scim.Resource{}, scimerrors.ScimErrorResourceNotFound("")
 	}
 
-	user, err := h.adminClient.Users.Get(id).Do()
+	user, err := h.adminClient.Users.Get(id).Projection("full").Do()
 	if err != nil {
 		slog.Warn("Error getting user", "id", id, "error", err)
 		return scim.Resource{}, err
@@ -161,6 +164,11 @@ func emailToResource(entry *admin.User) []map[string]interface{} {
 }
 
 func userToUserResource(entry *admin.User) scim.Resource {
+
+	if entry.CustomSchemas == nil {
+		entry.CustomSchemas = make(map[string]googleapi.RawMessage)
+	}
+
 	return scim.Resource{
 		ID:         entry.Id,
 		ExternalID: optional.NewString(entry.PrimaryEmail),
@@ -175,11 +183,16 @@ func userToUserResource(entry *admin.User) scim.Resource {
 			"userName":    entry.PrimaryEmail,
 			"active":      !entry.Suspended,
 			"orgUnitPath": entry.OrgUnitPath,
+			"custom":      entry.CustomSchemas,
 		},
 	}
 }
 
-func resourceToUser(resourceAttrs map[string]interface{}) (*admin.User, error) {
+type RawRequest struct {
+	Custom map[string]googleapi.RawMessage `json:"custom"`
+}
+
+func resourceToUser(request *http.Request, resourceAttrs map[string]interface{}) (*admin.User, error) {
 	nameMap := casting.SingleValue[map[string]interface{}](resourceAttrs["name"])
 
 	emails, ok := resourceAttrs["emails"].([]interface{})
@@ -206,6 +219,11 @@ func resourceToUser(resourceAttrs map[string]interface{}) (*admin.User, error) {
 		return nil, scimerrors.ScimErrorBadRequest("Need a primary email to match username")
 	}
 
+	rawRequest, err := getRawRequest(request)
+	if err != nil {
+		return nil, err
+	}
+
 	return &admin.User{
 		// Only update primary e-mails. Legacy aliases are managed in Google Workspace
 		PrimaryEmail: userName,
@@ -215,9 +233,33 @@ func resourceToUser(resourceAttrs map[string]interface{}) (*admin.User, error) {
 			GivenName:   casting.SingleValue[string](nameMap["givenName"]),
 			FullName:    casting.SingleValue[string](nameMap["formatted"]),
 		},
-		OrgUnitPath: casting.SingleValue[string](resourceAttrs["orgUnitPath"]),
-		Suspended:   !casting.SingleValue[bool](resourceAttrs["active"]),
+		OrgUnitPath:   casting.SingleValue[string](resourceAttrs["orgUnitPath"]),
+		Suspended:     !casting.SingleValue[bool](resourceAttrs["active"]),
+		CustomSchemas: rawRequest.Custom,
 	}, nil
+}
+
+// Need to grab the custom fields from the raw request because we don't know the field names at compile time.
+// Thus we can't describe these fields in the schema and the scim library drops everything that is not described in the schema.
+func getRawRequest(request *http.Request) (*RawRequest, error) {
+	// This works because the scim library replaces the input stream with a byte buffer.
+	raw, err := io.ReadAll(request.Body)
+	if err != nil {
+		slog.Warn("Error reading raw request body", "error", err)
+		return nil, err
+	}
+
+	rawRequest := RawRequest{}
+
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.UseNumber()
+	err = decoder.Decode(&rawRequest)
+
+	if err != nil {
+		slog.Warn("Error decoding raw request body", "error", err)
+		return nil, err
+	}
+	return &rawRequest, nil
 }
 
 func (h UserHandler) GetAll(_ *http.Request, params scim.ListRequestParams) (scim.Page, error) {
@@ -230,7 +272,7 @@ func (h UserHandler) GetAll(_ *http.Request, params scim.ListRequestParams) (sci
 
 	resources := make([]scim.Resource, 0)
 
-	request := h.adminClient.Users.List().Domain(h.cfg.Domain)
+	request := h.adminClient.Users.List().Domain(h.cfg.Domain).Projection("full")
 
 	if principal != "" {
 		request = request.Query("email=" + principal)
@@ -257,7 +299,7 @@ func isEmptyPath(path *filter.Path) bool {
 	return path == nil || path.String() == ""
 }
 
-func (h UserHandler) Patch(_ *http.Request, id string, operations []scim.PatchOperation) (scim.Resource, error) {
+func (h UserHandler) Patch(request *http.Request, id string, operations []scim.PatchOperation) (scim.Resource, error) {
 	slog.Info("PATCH /v2/Users", "id", id, "operations", operations)
 
 	if len(operations) != 1 {
@@ -279,18 +321,18 @@ func (h UserHandler) Patch(_ *http.Request, id string, operations []scim.PatchOp
 		return scim.Resource{}, scimerrors.ScimErrorBadRequest("Value must be a JSON object")
 	}
 
-	return h.updateUser(attributes, id)
+	return h.updateUser(request, attributes, id)
 
 }
 
-func (h UserHandler) Replace(_ *http.Request, id string, attributes scim.ResourceAttributes) (scim.Resource, error) {
+func (h UserHandler) Replace(request *http.Request, id string, attributes scim.ResourceAttributes) (scim.Resource, error) {
 	slog.Info("PUT /v2/Users", "id", id, "attributes", attributes)
 
-	return h.updateUser(attributes, id)
+	return h.updateUser(request, attributes, id)
 }
 
-func (h UserHandler) updateUser(attributes scim.ResourceAttributes, id string) (scim.Resource, error) {
-	userRequest, err := resourceToUser(attributes)
+func (h UserHandler) updateUser(request *http.Request, attributes scim.ResourceAttributes, id string) (scim.Resource, error) {
+	userRequest, err := resourceToUser(request, attributes)
 
 	if err != nil {
 		return scim.Resource{}, err
