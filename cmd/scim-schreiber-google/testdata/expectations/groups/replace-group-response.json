@@ -8,6 +8,7 @@
     "resourceType": "Group"
   },
   "schemas": [
-    "urn:ietf:params:model:schemas:core:2.0:Group"
+    "urn:ietf:params:scim:schemas:core:2.0:Group",
+    "urn:ietf:params:scim:schemas:extension:google:2.0:CloudIdentityGroup"
   ]
 }

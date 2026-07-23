@@ -1,7 +1,11 @@
 {
   "Resources" : [
     {
-      "schemas": [ "urn:ietf:params:model:schemas:core:2.0:User" ],
+      "schemas": [
+        "urn:ietf:params:scim:schemas:core:2.0:User",
+	"urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser",
+        "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"
+      ],
       "externalId":"svc_authentik@dev.suse.com",
       "id":"113765969969838891919",
       "active": true,
@@ -23,7 +27,11 @@
       }
     },
     {
-      "schemas": [ "urn:ietf:params:model:schemas:core:2.0:User" ],
+      "schemas": [
+        "urn:ietf:params:scim:schemas:core:2.0:User",
+	"urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser",
+        "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"
+      ],
       "externalId":"testokta@dev.suse.com",
       "id":"104963533172021742203",
       "active": false,

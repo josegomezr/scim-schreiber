@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/elimity-com/scim"
 	"github.com/h2non/gock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -19,6 +18,8 @@ import (
 	admin "google.golang.org/api/admin/directory/v1"
 	"google.golang.org/api/licensing/v1"
 	"google.golang.org/api/option"
+
+	"github.com/josegomezr/scim-schreiber-ldap/internal/server"
 )
 
 const (
@@ -28,7 +29,7 @@ const (
 type SCIMUserTestSuite struct {
 	suite.Suite
 	ctx    context.Context
-	server scim.Server
+	server http.Handler
 }
 
 func createApiClientWithoutCredentials() (*admin.Service, error) {
@@ -54,10 +55,10 @@ func (suite *SCIMUserTestSuite) SetupSuite() {
 	license, err := createLicenseClientWithoutCredentials()
 	require.NoError(suite.T(), err)
 
-	server, err := createSCIMServer(cfg, client, license, NewProductInformationFromFile("testdata/products.yaml"))
+	s, err := createSCIMServer(cfg, client, license, NewProductInformationFromFile("testdata/products.yaml"))
 	require.NoError(suite.T(), err)
 
-	suite.server = server
+	suite.server = server.FlattenPatchMiddleware(s)
 }
 
 func (suite *SCIMUserTestSuite) TestCreateUser() {
@@ -93,7 +94,7 @@ func (suite *SCIMUserTestSuite) TestReplaceUser() {
 	file, err := os.Open(filepath.Join(".", "testdata", "requests", "users", "replace-user.json"))
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		require.NoError(t, file.Close())
+		file.Close()
 	})
 
 	defer gock.Off()
@@ -125,7 +126,7 @@ func (suite *SCIMUserTestSuite) TestPatchUser() {
 	file, err := os.Open(filepath.Join(".", "testdata", "requests", "users", "user_change.json"))
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		require.NoError(t, file.Close())
+		file.Close()
 	})
 
 	defer gock.Off()

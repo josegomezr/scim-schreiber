@@ -4,17 +4,15 @@ import (
 	"context"
 	"log"
 	"log/slog"
-	"net/http"
 	"os"
 
 	"github.com/elimity-com/scim"
-	"github.com/elimity-com/scim/optional"
 	"golang.org/x/oauth2/google"
 	admin "google.golang.org/api/admin/directory/v1"
 	"google.golang.org/api/licensing/v1"
 	"google.golang.org/api/option"
 
-	"github.com/josegomezr/scim-schreiber-ldap/internal/logging"
+	"github.com/josegomezr/scim-schreiber-ldap/internal/server"
 )
 
 type Config struct {
@@ -52,35 +50,14 @@ func main() {
 		return
 	}
 
-	server, err := createSCIMServer(cfg, adminClient, licenseClient, NewProductInformationFromFile("products.yaml"))
+	scimServer, err := createSCIMServer(cfg, adminClient, licenseClient, NewProductInformationFromFile("products.yaml"))
 
 	if err != nil {
 		slog.Error("Failed to create server", "err", err)
 		return
 	}
 
-	startHttpServer(server, err)
-}
-
-func startHttpServer(server scim.Server, err error) {
-	mux := http.NewServeMux()
-
-	mux.HandleFunc("GET /-/live", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(200)
-	})
-
-	accessLogger := logging.NewAccessLogger(server)
-	mux.Handle("/", accessLogger)
-
-	listenAddr := ":9440"
-	slog.Info("Listening", "listenAddr", listenAddr)
-	// TODO(josegomezr): configurable ports here
-	err = http.ListenAndServe(listenAddr, mux)
-
-	if err != nil {
-		slog.Error("Failed to start http server", "err", err)
-		return
-	}
+	server.StartHttpServer(scimServer)
 }
 
 func createTokenSource(ctx context.Context, cfg *Config) (option.ClientOption, error) {
@@ -155,56 +132,32 @@ func createLicenseClient(ctx context.Context, opts ...option.ClientOption) (*lic
 }
 
 func createSCIMServer(cfg Config, adminClient *admin.Service, licenseClient *licensing.Service, products *ProductInformation) (scim.Server, error) {
-	config := scim.ServiceProviderConfig{
-		AuthenticationSchemes: []scim.AuthenticationScheme{
+	config := server.NewSCIMConfig()
+	config.SupportPatch = true
+
+	return server.NewSCIMServer(
+		UserHandler{
+			cfg:                &cfg,
+			adminClient:        adminClient,
+			licenseClient:      licenseClient,
+			productInformation: products,
+		},
+		GroupHandler{
+			cfg:    &cfg,
+			client: adminClient,
+		},
+		config,
+		[]scim.SchemaExtension{
 			{
-				Type:             scim.AuthenticationTypeHTTPBasic,
-				Name:             "HTTP Basic",
-				DocumentationURI: optional.NewString("http://nobody.cares/"),
-				SpecURI:          optional.NewString("http://nobody.cares/"),
+				Schema:   SchemaExtensionSUSEGoogleUser,
+				Required: true,
 			},
 		},
-		MaxResults:       100,
-		SupportFiltering: true,
-		SupportPatch:     true,
-		DocumentationURI: optional.NewString("http://nobody.cares/"),
-	}
-
-	resourceTypes := []scim.ResourceType{
-		{
-			ID:          optional.NewString("User"),
-			Name:        "User",
-			Endpoint:    "/Users",
-			Description: optional.NewString("User Account"),
-			Schema:      UserSchema,
-			Handler: UserHandler{
-				cfg:                &cfg,
-				adminClient:        adminClient,
-				licenseClient:      licenseClient,
-				productInformation: products,
+		[]scim.SchemaExtension{
+			{
+				Schema:   SchemaExtensionGoogleCloudIdentityGroup,
+				Required: true,
 			},
 		},
-		{
-			ID:          optional.NewString("Group"),
-			Name:        "Group",
-			Endpoint:    "/Groups",
-			Description: optional.NewString("Groups"),
-			Schema:      GroupSchema,
-			Handler: GroupHandler{
-				cfg:    &cfg,
-				client: adminClient,
-			},
-		},
-	}
-
-	serverArgs := &scim.ServerArgs{
-		ServiceProviderConfig: &config,
-		ResourceTypes:         resourceTypes,
-	}
-
-	serverOpts := []scim.ServerOption{
-		scim.WithLogger(&ScimLogger{}), // optional, default is no logging
-	}
-
-	return scim.NewServer(serverArgs, serverOpts...)
+	)
 }

@@ -73,5 +73,5 @@ func createSCIMServer(cfg Config) (scim.Server, error) {
 			client:          jiraClient,
 			groupExclusions: groupExclusions,
 		},
-	)
+		nil, nil, nil)
 }

@@ -11,13 +11,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/elimity-com/scim"
 	"github.com/h2non/gock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/josegomezr/scim-schreiber-ldap/cmd/scim-schreiber-ldap/testhelpers"
+	"github.com/josegomezr/scim-schreiber-ldap/internal/server"
 )
 
 import _ "embed"
@@ -45,7 +45,7 @@ type SCIMGroupTestSuite struct {
 	suite.Suite
 	ldapContainer *testhelpers.LdapContainer
 	ctx           context.Context
-	server        scim.Server
+	server        http.Handler
 }
 
 func (suite *SCIMGroupTestSuite) SetupSuite() {
@@ -61,10 +61,10 @@ func (suite *SCIMGroupTestSuite) SetupSuite() {
 	license, err := createLicenseClientWithoutCredentials()
 	require.NoError(suite.T(), err)
 
-	server, err := createSCIMServer(cfg, client, license, nil)
+	s, err := createSCIMServer(cfg, client, license, nil)
 	require.NoError(suite.T(), err)
 
-	suite.server = server
+	suite.server = server.FlattenPatchMiddleware(s)
 }
 
 func (suite *SCIMGroupTestSuite) TestCreateGroup() {
@@ -132,7 +132,7 @@ func (suite *SCIMGroupTestSuite) TestReplaceGroupWithPatch() {
 	file, err := os.Open(filepath.Join(".", "testdata", "requests", "groups", "patch_group.json"))
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		require.NoError(t, file.Close())
+		file.Close()
 	})
 
 	defer gock.Off()

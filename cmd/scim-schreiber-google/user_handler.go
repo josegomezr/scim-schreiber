@@ -21,6 +21,7 @@ import (
 
 	"github.com/josegomezr/scim-schreiber-ldap/internal/casting"
 	"github.com/josegomezr/scim-schreiber-ldap/internal/model"
+	"github.com/josegomezr/scim-schreiber-ldap/internal/utils"
 )
 
 type UserHandler struct {
@@ -224,6 +225,11 @@ func resourceToUser(request *http.Request, resourceAttrs map[string]interface{})
 		return nil, err
 	}
 
+	orgUnitPath := ""
+	if val, ok := utils.GetExtensionAttribute(resourceAttrs, "urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser", "orgUnitPath"); ok {
+		orgUnitPath = casting.SingleValue[string](val)
+	}
+
 	return &admin.User{
 		// Only update primary e-mails. Legacy aliases are managed in Google Workspace
 		PrimaryEmail: userName,
@@ -233,7 +239,7 @@ func resourceToUser(request *http.Request, resourceAttrs map[string]interface{})
 			GivenName:   casting.SingleValue[string](nameMap["givenName"]),
 			FullName:    casting.SingleValue[string](nameMap["formatted"]),
 		},
-		OrgUnitPath:   casting.SingleValue[string](resourceAttrs["orgUnitPath"]),
+		OrgUnitPath:   orgUnitPath,
 		Suspended:     !casting.SingleValue[bool](resourceAttrs["active"]),
 		CustomSchemas: rawRequest.Custom,
 	}, nil

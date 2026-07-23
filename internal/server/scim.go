@@ -20,10 +20,10 @@ func (c *ScimLogger) Error(args ...any) {
 	slog.Error(fmt.Sprintln(args...))
 }
 
-func NewSCIMServer(userHandler scim.ResourceHandler, groupHandler scim.ResourceHandler) (scim.Server, error) {
+func NewSCIMConfig() *scim.ServiceProviderConfig {
 	dummyUri := optional.NewString(DUMMY_URI)
 
-	config := scim.ServiceProviderConfig{
+	return &scim.ServiceProviderConfig{
 		AuthenticationSchemes: []scim.AuthenticationScheme{
 			{
 				Type:             scim.AuthenticationTypeHTTPBasic,
@@ -36,38 +36,45 @@ func NewSCIMServer(userHandler scim.ResourceHandler, groupHandler scim.ResourceH
 		SupportFiltering: true,
 		DocumentationURI: dummyUri,
 	}
+}
+
+func NewSCIMServer(userHandler scim.ResourceHandler, groupHandler scim.ResourceHandler, config *scim.ServiceProviderConfig, userExtensions []scim.SchemaExtension, groupExtensions []scim.SchemaExtension) (scim.Server, error) {
+	if config == nil {
+		config = NewSCIMConfig()
+	}
+
+	userExtensions = append(userExtensions, []scim.SchemaExtension{
+		{
+			Schema:   schema.ExtensionEnterpriseUser(),
+			Required: false,
+		},
+	}...)
+
+	groupExtensions = append(groupExtensions, []scim.SchemaExtension{}...)
 
 	resourceTypes := []scim.ResourceType{
 		{
-			ID:          optional.NewString("User"),
-			Name:        "User",
-			Endpoint:    "/Users",
-			Description: optional.NewString("User Account"),
-			Schema:      schema.CoreUserSchema(),
-			SchemaExtensions: []scim.SchemaExtension{
-				{
-					Schema:   schema.ExtensionEnterpriseUser(),
-					Required: false,
-				},
-				{
-					Schema:   SchemaExtensionSUSEUser,
-					Required: false,
-				},
-			},
-			Handler: userHandler,
+			ID:               optional.NewString("User"),
+			Name:             "User",
+			Endpoint:         "/Users",
+			Description:      optional.NewString("User Account"),
+			Schema:           schema.CoreUserSchema(),
+			SchemaExtensions: userExtensions,
+			Handler:          userHandler,
 		},
 		{
-			ID:          optional.NewString("Group"),
-			Name:        "Group",
-			Endpoint:    "/Groups",
-			Description: optional.NewString("Groups"),
-			Schema:      schema.CoreGroupSchema(),
-			Handler:     groupHandler,
+			ID:               optional.NewString("Group"),
+			Name:             "Group",
+			Endpoint:         "/Groups",
+			Description:      optional.NewString("Groups"),
+			Schema:           schema.CoreGroupSchema(),
+			SchemaExtensions: groupExtensions,
+			Handler:          groupHandler,
 		},
 	}
 
 	serverArgs := &scim.ServerArgs{
-		ServiceProviderConfig: &config,
+		ServiceProviderConfig: config,
 		ResourceTypes:         resourceTypes,
 	}
 

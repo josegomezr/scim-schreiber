@@ -1,6 +1,8 @@
 {
   "schemas": [
-    "urn:ietf:params:model:schemas:core:2.0:User"
+    "urn:ietf:params:scim:schemas:core:2.0:User",
+    "urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser",
+    "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"
   ],
   "externalId": "first.last@example.com",
   "id": "104965396198408263080",

@@ -25,6 +25,10 @@
   ],
   "custom": {},
   "orgUnitPath" : "/Authentik Staging",
-  "schemas" : [ "urn:ietf:params:model:schemas:core:2.0:User" ],
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User",
+    "urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser",
+    "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"
+  ],
   "userName" : "testuser@dev.suse.com"
 }

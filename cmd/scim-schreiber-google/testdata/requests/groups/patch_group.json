@@ -2,17 +2,15 @@
   "schemas": [
     "urn:ietf:params:scim:api:messages:2.0:PatchOp"
   ],
-  "operations": [
+  "Operations": [
     {
-      "Op": "replace",
-      "Path": null,
-      "Value": {
+      "op": "replace",
+      "value": {
         "displayName": "google-workspace-staging",
-        "email": "google-workspace-staging@dev.suse.com",
         "externalId": "4e5568f1-ac3d-456f-a239-6a51ba048d4f",
-        "schemas": [
-          "urn:ietf:params:scim:schemas:core:2.0:Group"
-        ]
+	"urn:ietf:params:scim:schemas:extension:google:2.0:CloudIdentityGroup": {
+		"email": "google-workspace-staging@dev.suse.com"
+	}
       }
     }
   ]

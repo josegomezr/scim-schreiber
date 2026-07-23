@@ -55,5 +55,10 @@ func createSCIMServer(cfg Config) (scim.Server, error) {
 		GroupHandler{
 			cfg: &cfg,
 		},
-	)
+		nil, []scim.SchemaExtension{
+			{
+				Schema:   server.SchemaExtensionSUSEUser,
+				Required: false,
+			},
+		}, nil)
 }
