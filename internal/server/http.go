@@ -4,6 +4,8 @@ import (
 	"github.com/elimity-com/scim"
 	"log/slog"
 	"net/http"
+
+	"github.com/josegomezr/scim-schreiber-ldap/internal/logging"
 )
 
 type Middleware func(http.Handler) http.Handler
@@ -15,7 +17,7 @@ func StartHttpServer(server scim.Server, middlewares ...Middleware) {
 		w.WriteHeader(200)
 	})
 
-	mux.Handle("/", server)
+	mux.Handle("/", logging.NewAccessLogger(server))
 
 	var handler http.Handler = mux
 
