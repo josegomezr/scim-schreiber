@@ -1,0 +1,15 @@
+{
+  "customSchemas": {
+    "Region": {
+      "addressesWorkCountryCode": "DE"
+    }
+  },
+  "name": {
+    "displayName": "Display Test",
+    "familyName": "User",
+    "fullName": "Test User",
+    "givenName": "Replace"
+  },
+  "orgUnitPath": "/Authentik Staging",
+  "primaryEmail": "testuser@dev.suse.com"
+}

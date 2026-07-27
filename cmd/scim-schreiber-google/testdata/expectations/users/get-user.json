@@ -1,0 +1,83 @@
+{
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User",
+    "urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser",
+    "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"
+  ],
+  "externalId": "first.last@example.com",
+  "id": "104965396198408263080",
+  "active": true,
+  "userName": "first.last@example.com",
+  "displayName": "",
+  "name": {
+    "familyName": "LastName",
+    "formatted": "FirstName LastName",
+    "givenName": "FirstName"
+  },
+  "emails": [
+    {
+      "type": "work",
+      "primary": true,
+      "value": "first.last@example.com"
+    },
+    {
+      "type": "work",
+      "primary": false,
+      "value": "svc_test@example.com"
+    },
+    {
+      "type": "work",
+      "primary": false,
+      "value": "1000@example.com"
+    }
+  ],
+  "orgUnitPath": "/",
+  "entitlements": [
+    {
+      "type": "license",
+      "value": "Google Workspace Enterprise Standard"
+    }
+  ],
+  "custom": {
+    "User1921": {
+      "isSupervisor": true
+    },
+    "User2471": {
+      "workLocationType": "Home-Based"
+    },
+    "User7951": {
+      "division": "Group IT EngInfra"
+    },
+    "User": {
+      "userType": "Employee"
+    },
+    "ProxyAddresses": {
+      "ProxyAddresses": [
+        {
+          "type": "work",
+          "value": "1000@example.com"
+        },
+        {
+          "type": "work",
+          "value": "svc_test@example.com"
+        }
+      ]
+    },
+    "Region": {
+      "addressesWorkCountryCode": "BG"
+    },
+    "Region7281": {
+      "Office": "BGOOH - Out of Home: Bulgaria"
+    },
+    "Job_Family": {
+      "jobfamily5241": "IT Management"
+    },
+    "L3_Leader": {
+      "L3_Leader": "L3 Leader Name"
+    }
+  },
+  "meta": {
+    "location": "Users/104965396198408263080",
+    "resourceType": "User"
+  }
+}

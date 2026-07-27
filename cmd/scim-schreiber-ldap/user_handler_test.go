@@ -141,8 +141,8 @@ func (suite *SCIMUserTestSuite) TestCreateUserNoName() {
   ],
   "schemas": [
     "urn:ietf:params:scim:schemas:core:2.0:User",
-    "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User", 
-    "urn:ietf:params:scim:schemas:extension:suse:2.0:User"
+    "urn:ietf:params:scim:schemas:extension:suse:2.0:User",
+    "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"
   ],
   "userName": "noname",
   "meta": {
@@ -201,8 +201,8 @@ func (suite *SCIMUserTestSuite) TestCreateUser() {
   },
   "schemas": [
     "urn:ietf:params:scim:schemas:core:2.0:User",
-    "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User",
-    "urn:ietf:params:scim:schemas:extension:suse:2.0:User"
+    "urn:ietf:params:scim:schemas:extension:suse:2.0:User",
+    "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"
   ]
 }
     `
@@ -301,8 +301,8 @@ func (suite *SCIMUserTestSuite) TestPatchUser() {
 		],
 	"schemas" : [
 	"urn:ietf:params:scim:schemas:core:2.0:User",
-	"urn:ietf:params:scim:schemas:extension:enterprise:2.0:User",
-	"urn:ietf:params:scim:schemas:extension:suse:2.0:User"
+	"urn:ietf:params:scim:schemas:extension:suse:2.0:User",
+	"urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"
 	],
 	"urn:ietf:params:scim:schemas:extension:enterprise:2.0:User": {
 		"organization": "SUSE"
@@ -351,8 +351,8 @@ func (suite *SCIMUserTestSuite) TestGetUser() {
      {
 	"schemas" : [
 		"urn:ietf:params:scim:schemas:core:2.0:User",
-		"urn:ietf:params:scim:schemas:extension:enterprise:2.0:User",
-		"urn:ietf:params:scim:schemas:extension:suse:2.0:User"
+		"urn:ietf:params:scim:schemas:extension:suse:2.0:User",
+		"urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"
 	],
        "externalId":"uid=test,ou=people,dc=suse,dc=com",
        "id":"test",
@@ -397,8 +397,8 @@ func (suite *SCIMUserTestSuite) TestGetAllUsers() {
     },
 	"schemas" : [
 		"urn:ietf:params:scim:schemas:core:2.0:User",
-		"urn:ietf:params:scim:schemas:extension:enterprise:2.0:User",
-		"urn:ietf:params:scim:schemas:extension:suse:2.0:User"
+		"urn:ietf:params:scim:schemas:extension:suse:2.0:User",
+		"urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"
 	]
   } ],
   "itemsPerPage" : 100,
@@ -463,8 +463,8 @@ func (suite *SCIMUserTestSuite) TestFilterUsers() {
     },
 	"schemas" : [
 		"urn:ietf:params:scim:schemas:core:2.0:User",
-		"urn:ietf:params:scim:schemas:extension:enterprise:2.0:User",
-		"urn:ietf:params:scim:schemas:extension:suse:2.0:User"
+		"urn:ietf:params:scim:schemas:extension:suse:2.0:User",
+		"urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"
 	]
   } ],
   "itemsPerPage" : 100,

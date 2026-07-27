@@ -1,0 +1,36 @@
+{
+  "Resources" : [{
+    "schemas": [
+      "urn:ietf:params:scim:schemas:core:2.0:User",
+      "urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser",
+      "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"
+    ],
+    "externalId":"felix-test@dev.suse.com",
+    "id":"104965396198408263080",
+    "active": true,
+    "userName":"felix-test@dev.suse.com",
+    "displayName": "",
+    "name": {
+      "familyName":"Test",
+      "formatted":"Felix Test",
+      "givenName":"Felix"
+    },
+    "custom": {
+      "User1921": {
+        "isSupervisor": false
+      }
+    },
+    "emails": [
+      { "type": "work", "primary": true, "value": "felix-test@dev.suse.com" }
+    ],
+    "orgUnitPath":"/Authentik Staging",
+    "meta": {
+      "location": "Users/104965396198408263080",
+      "resourceType":"User"
+    }
+  }],
+  "itemsPerPage" : 100,
+  "schemas" : [ "urn:ietf:params:scim:api:messages:2.0:ListResponse" ],
+  "startIndex" : 1,
+  "totalResults" : 1
+}

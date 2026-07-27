@@ -1,0 +1,60 @@
+{
+  "Resources" : [
+    {
+      "schemas": [
+        "urn:ietf:params:scim:schemas:core:2.0:User",
+	"urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser",
+        "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"
+      ],
+      "externalId":"svc_authentik@dev.suse.com",
+      "id":"113765969969838891919",
+      "active": true,
+      "userName":"svc_authentik@dev.suse.com",
+      "displayName": "",
+      "name": {
+        "familyName":"authentik",
+        "formatted":"svc authentik",
+        "givenName":"svc"
+      },
+      "emails": [
+        { "type": "work", "primary": true, "value": "svc_authentik@dev.suse.com" }
+      ],
+      "custom": {},
+      "orgUnitPath":"/",
+      "meta": {
+        "location": "Users/113765969969838891919",
+        "resourceType":"User"
+      }
+    },
+    {
+      "schemas": [
+        "urn:ietf:params:scim:schemas:core:2.0:User",
+	"urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser",
+        "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"
+      ],
+      "externalId":"testokta@dev.suse.com",
+      "id":"104963533172021742203",
+      "active": false,
+      "userName":"testokta@dev.suse.com",
+      "displayName": "",
+      "name": {
+        "familyName":"Okta",
+        "formatted":"Test Okta",
+        "givenName":"Test"
+      },
+      "custom": {},
+      "emails": [
+        { "type": "work", "primary": true, "value": "testokta@dev.suse.com" }
+      ],
+      "orgUnitPath":"/CW Limited Access",
+      "meta": {
+        "location": "Users/104963533172021742203",
+        "resourceType":"User"
+      }
+    }
+  ],
+  "itemsPerPage" : 100,
+  "schemas" : [ "urn:ietf:params:scim:api:messages:2.0:ListResponse" ],
+  "startIndex" : 1,
+  "totalResults" : 2
+}

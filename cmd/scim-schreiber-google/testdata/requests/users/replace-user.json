@@ -1,0 +1,30 @@
+{
+  "userName": "testuser@dev.suse.com",
+  "name": {
+    "givenName": "Replace",
+    "familyName": "User",
+    "formatted":"Test User"
+  },
+  "displayName": "Display Test",
+  "active": true,
+  "emails": [
+    {
+      "primary": true,
+      "type": "work",
+      "value": "testuser@dev.suse.com"
+    }
+  ],
+  "custom": {
+    "Region" : {
+      "addressesWorkCountryCode" : "DE"
+    }
+  },
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User",
+    "urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser",
+    "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"
+  ],
+  "urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser": {
+    "orgUnitPath": "/Authentik Staging"
+  }
+}
