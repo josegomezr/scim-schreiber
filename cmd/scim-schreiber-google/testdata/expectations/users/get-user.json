@@ -31,7 +31,9 @@
       "value": "1000@example.com"
     }
   ],
-  "orgUnitPath": "/",
+  "urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser": {
+    "orgUnitPath": "/"
+  },
   "entitlements": [
     {
       "type": "license",

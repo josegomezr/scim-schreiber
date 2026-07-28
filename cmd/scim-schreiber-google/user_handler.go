@@ -185,6 +185,7 @@ func userToUserResource(entry *admin.User) scim.Resource {
 			"active":      !entry.Suspended,
 			"orgUnitPath": entry.OrgUnitPath,
 			"custom":      entry.CustomSchemas,
+			"urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser": googleExt,
 		},
 	}
 }

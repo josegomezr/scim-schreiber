@@ -24,7 +24,9 @@
     }
   ],
   "custom": {},
-  "orgUnitPath" : "/Authentik Staging",
+  "urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser": {
+    "orgUnitPath": "/Authentik Staging"
+  },
   "schemas": [
     "urn:ietf:params:scim:schemas:core:2.0:User",
     "urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser",

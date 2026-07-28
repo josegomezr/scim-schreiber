@@ -23,7 +23,9 @@
     "emails": [
       { "type": "work", "primary": true, "value": "felix-test@dev.suse.com" }
     ],
-    "orgUnitPath":"/Authentik Staging",
+    "urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser": {
+      "orgUnitPath": "/Authentik Staging"
+    },
     "meta": {
       "location": "Users/104965396198408263080",
       "resourceType":"User"

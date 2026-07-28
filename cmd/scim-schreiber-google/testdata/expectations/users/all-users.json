@@ -20,7 +20,9 @@
         { "type": "work", "primary": true, "value": "svc_authentik@dev.suse.com" }
       ],
       "custom": {},
-      "orgUnitPath":"/",
+      "urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser": {
+        "orgUnitPath": "/"
+      },
       "meta": {
         "location": "Users/113765969969838891919",
         "resourceType":"User"
@@ -46,7 +48,9 @@
       "emails": [
         { "type": "work", "primary": true, "value": "testokta@dev.suse.com" }
       ],
-      "orgUnitPath":"/CW Limited Access",
+      "urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser": {
+        "orgUnitPath": "/CW Limited Access"
+      },
       "meta": {
         "location": "Users/104963533172021742203",
         "resourceType":"User"
