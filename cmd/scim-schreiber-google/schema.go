@@ -36,5 +36,22 @@ var SchemaExtensionSUSEGoogleUser = schema.Schema{
 			Uniqueness: schema.AttributeUniquenessNone(),
 			Mutability: schema.AttributeMutabilityReadWrite(),
 		})),
+		schema.ComplexCoreAttribute(schema.ComplexParams{
+			Name:        "relations",
+			Required:    false,
+			MultiValued: true,
+			Uniqueness:  schema.AttributeUniquenessNone(),
+			Mutability:  schema.AttributeMutabilityReadWrite(),
+			SubAttributes: []schema.SimpleParams{
+				schema.SimpleStringParams(schema.StringParams{
+					Name:     "type",
+					Required: true,
+				}),
+				schema.SimpleStringParams(schema.StringParams{
+					Name:     "value",
+					Required: true,
+				}),
+			},
+		}),
 	},
 }

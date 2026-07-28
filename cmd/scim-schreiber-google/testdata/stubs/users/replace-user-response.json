@@ -27,6 +27,12 @@
       "address": "testuser@dev.suse.com.test-google-a.com"
     }
   ],
+  "relations": [
+    {
+      "type": "manager",
+      "value": "manager.email@example.org"
+    }
+  ],
   "addresses": [
     {
       "streetAddress": "Streetname 1",

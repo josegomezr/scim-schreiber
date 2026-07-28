@@ -21,5 +21,11 @@
     "givenName": "Replace"
   },
   "orgUnitPath": "/Authentik Staging",
-  "primaryEmail": "testuser@dev.suse.com"
+  "primaryEmail": "testuser@dev.suse.com",
+  "relations": [
+    {
+      "type": "manager",
+      "value": "manager.email@example.org"
+    }
+  ]
 }

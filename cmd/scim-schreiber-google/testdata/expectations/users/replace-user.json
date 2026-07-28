@@ -29,7 +29,13 @@
   "custom": {},
   "entitlements": [],
   "urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser": {
-    "orgUnitPath": "/Authentik Staging"
+    "orgUnitPath": "/Authentik Staging",
+    "relations": [
+      {
+        "type": "manager",
+        "value": "manager.email@example.org"
+      }
+    ]
   },
   "schemas": [
     "urn:ietf:params:scim:schemas:core:2.0:User",

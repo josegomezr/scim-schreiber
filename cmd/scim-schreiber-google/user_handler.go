@@ -184,6 +184,7 @@ func userToUserResource(entry *admin.User) scim.Resource {
 
 	googleExt := map[string]interface{}{
 		"orgUnitPath": entry.OrgUnitPath,
+		"relations":   entry.Relations,
 	}
 
 	addresses := make([]map[string]interface{}, 0)
@@ -273,6 +274,19 @@ func resourceToUser(request *http.Request, resourceAttrs map[string]interface{})
 		}
 	}
 
+	relations := make([]admin.UserRelation, 0)
+	if val, ok := utils.GetExtensionAttribute(resourceAttrs, "urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser", "relations"); ok {
+		relationsRaw := val.([]interface{})
+
+		for _, relationRaw := range relationsRaw {
+			relation := relationRaw.(map[string]interface{})
+			relations = append(relations, admin.UserRelation{
+				Type:  relation["type"].(string),
+				Value: relation["value"].(string),
+			})
+		}
+	}
+
 	return &admin.User{
 		// Only update primary e-mails. Legacy aliases are managed in Google Workspace
 		PrimaryEmail: userName,
@@ -286,6 +300,7 @@ func resourceToUser(request *http.Request, resourceAttrs map[string]interface{})
 		Suspended:     !casting.SingleValue[bool](resourceAttrs["active"]),
 		CustomSchemas: rawRequest.Custom,
 		Addresses:     googleAddresses,
+		Relations:     relations,
 	}, nil
 }
 
