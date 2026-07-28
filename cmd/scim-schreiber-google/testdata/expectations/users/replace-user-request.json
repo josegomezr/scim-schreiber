@@ -10,8 +10,37 @@
     }
   ],
   "customSchemas": {
+    "Job_Family": {
+      "jobfamily5241": "IT Management"
+    },
+    "L3_Leader": {
+      "L3_Leader": "L3 lead"
+    },
+    "ProxyAddresses": {
+      "ProxyAddresses": [
+        {
+          "type": "work",
+          "value": "testuser-alias23@dev.suse.com"
+        }
+      ]
+    },
     "Region": {
       "addressesWorkCountryCode": "DE"
+    },
+    "Region7281": {
+      "Office": "CZOOH - Out of Home: Czech Republic"
+    },
+    "User": {
+      "userType": "Employee"
+    },
+    "User1921": {
+      "isSupervisor": true
+    },
+    "User2471": {
+      "workLocationType": "Home-Based"
+    },
+    "User7951": {
+      "division": "IT Platform Engineering"
     }
   },
   "name": {

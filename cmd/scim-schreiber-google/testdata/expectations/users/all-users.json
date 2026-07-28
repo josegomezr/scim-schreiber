@@ -21,13 +21,19 @@
       "emails": [
         { "type": "work", "primary": true, "value": "svc_authentik@dev.suse.com" }
       ],
-      "custom": {},
       "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User": {
+        "division": ""
       },
       "title": "",
+      "userType": "",
       "urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser": {
         "orgUnitPath": "/",
-        "relations": null
+        "relations": null,
+        "isSupervisor": false,
+        "jobFamily": "",
+        "l3leader": "",
+        "office": "",
+        "workLocationType": ""
       },
       "meta": {
         "location": "Users/113765969969838891919",
@@ -52,16 +58,22 @@
       },
       "addresses": [],
       "phoneNumbers": [],
-      "custom": {},
       "emails": [
         { "type": "work", "primary": true, "value": "testokta@dev.suse.com" }
       ],
       "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User": {
+        "division": ""
       },
       "title": "",
+      "userType": "",
       "urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser": {
         "orgUnitPath": "/CW Limited Access",
-        "relations": null
+        "relations": null,
+        "isSupervisor": false,
+        "jobFamily": "",
+        "l3leader": "",
+        "office": "",
+        "workLocationType": ""
       },
       "meta": {
         "location": "Users/104963533172021742203",

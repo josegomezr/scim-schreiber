@@ -33,7 +33,6 @@
     "formatted" : "Test User",
     "givenName" : "Replace"
   },
-  "custom": {},
   "entitlements": [],
   "urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser": {
     "orgUnitPath": "/Authentik Staging",
@@ -42,7 +41,12 @@
         "type": "manager",
         "value": "manager.email@example.org"
       }
-    ]
+    ],
+    "jobFamily": "IT Management",
+    "l3leader": "L3 lead",
+    "office": "CZOOH - Out of Home: Czech Republic",
+    "workLocationType": "Home-Based",
+    "isSupervisor": true
   },
   "phoneNumbers": [
     {
@@ -57,7 +61,8 @@
   "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User": {
     "organization": "SUSE",
     "costCenter": "1337",
-    "department": "Awesome department"
+    "department": "Awesome department",
+    "division": "IT Platform Engineering"
   },
   "title": "Amazing Engineer",
   "schemas": [
@@ -65,5 +70,6 @@
     "urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser",
     "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"
   ],
-  "userName" : "testuser@dev.suse.com"
+  "userName" : "testuser@dev.suse.com",
+  "userType": "Employee"
 }

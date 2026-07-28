@@ -17,18 +17,20 @@
       "formatted":"Felix Test",
       "givenName":"Felix"
     },
-    "custom": {
-      "User1921": {
-        "isSupervisor": false
-      }
-    },
     "emails": [
       { "type": "work", "primary": true, "value": "felix-test@dev.suse.com" }
     ],
     "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User": {
+      "division": ""
     },
     "title": "",
+    "userType": "",
     "urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser": {
+      "isSupervisor": false,
+      "jobFamily": "",
+      "l3leader": "",
+      "office": "",
+      "workLocationType": "",
       "orgUnitPath": "/Authentik Staging",
       "relations": null
     },

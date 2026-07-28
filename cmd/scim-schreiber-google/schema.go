@@ -24,6 +24,8 @@ var SchemaExtensionGoogleCloudIdentityGroup = schema.Schema{
 	},
 }
 
+const SCHEMA_GOOGLE_USER = "urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser"
+
 // this is a custom extension, as Google does not publish one containing all their user attributes
 var SchemaExtensionSUSEGoogleUser = schema.Schema{
 	ID:          "urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser",
@@ -53,5 +55,34 @@ var SchemaExtensionSUSEGoogleUser = schema.Schema{
 				}),
 			},
 		}),
+		schema.SimpleCoreAttribute(schema.SimpleBooleanParams(schema.BooleanParams{
+			Name:       "isSupervisor",
+			Required:   false,
+			Mutability: schema.AttributeMutabilityReadWrite(),
+		})),
+		schema.SimpleCoreAttribute(schema.SimpleStringParams(schema.StringParams{
+			Name:       "workLocationType",
+			Required:   false,
+			Uniqueness: schema.AttributeUniquenessNone(),
+			Mutability: schema.AttributeMutabilityReadWrite(),
+		})),
+		schema.SimpleCoreAttribute(schema.SimpleStringParams(schema.StringParams{
+			Name:       "office",
+			Required:   false,
+			Uniqueness: schema.AttributeUniquenessNone(),
+			Mutability: schema.AttributeMutabilityReadWrite(),
+		})),
+		schema.SimpleCoreAttribute(schema.SimpleStringParams(schema.StringParams{
+			Name:       "l3leader",
+			Required:   false,
+			Uniqueness: schema.AttributeUniquenessNone(),
+			Mutability: schema.AttributeMutabilityReadWrite(),
+		})),
+		schema.SimpleCoreAttribute(schema.SimpleStringParams(schema.StringParams{
+			Name:       "jobFamily",
+			Required:   false,
+			Uniqueness: schema.AttributeUniquenessNone(),
+			Mutability: schema.AttributeMutabilityReadWrite(),
+		})),
 	},
 }
