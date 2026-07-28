@@ -12,6 +12,11 @@
       "primary": true,
       "type": "work",
       "value": "testuser@dev.suse.com"
+    },
+    {
+      "primary": false,
+      "type": "work",
+      "value": "testuser-alias23@dev.suse.com"
     }
   ],
   "addresses": [

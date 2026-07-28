@@ -14,6 +14,23 @@
     "formatted": "FirstName LastName",
     "givenName": "FirstName"
   },
+  "addresses": [
+    {
+      "country": "BG",
+      "locality":  "Bulgaria OOH",
+      "postalCode": "00000",
+      "region": "Sofia",
+      "streetAddress": "NA"
+    },
+    {
+      "country": null,
+      "locality":  null,
+      "postalCode": null,
+      "region": null,
+      "streetAddress": null
+    }
+  ],
+  "phoneNumbers": [],
   "emails": [
     {
       "type": "work",
@@ -32,8 +49,20 @@
     }
   ],
   "urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser": {
-    "orgUnitPath": "/"
+    "orgUnitPath": "/",
+    "relations": [
+      {
+        "type": "manager",
+        "value":  "manager.name@example.com"
+      }
+    ]
   },
+  "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User": {
+    "organization": "SUSE",
+    "costCenter": "000",
+    "department": "Finance, IT, Procurement & IR"
+  },
+  "title": "Team Lead",
   "entitlements": [
     {
       "type": "license",

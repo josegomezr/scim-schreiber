@@ -8,6 +8,8 @@
     "externalId":"felix-test@dev.suse.com",
     "id":"104965396198408263080",
     "active": true,
+    "addresses": [],
+    "phoneNumbers": [],
     "userName":"felix-test@dev.suse.com",
     "displayName": "",
     "name": {
@@ -23,8 +25,12 @@
     "emails": [
       { "type": "work", "primary": true, "value": "felix-test@dev.suse.com" }
     ],
+    "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User": {
+    },
+    "title": "",
     "urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser": {
-      "orgUnitPath": "/Authentik Staging"
+      "orgUnitPath": "/Authentik Staging",
+      "relations": null
     },
     "meta": {
       "location": "Users/104965396198408263080",

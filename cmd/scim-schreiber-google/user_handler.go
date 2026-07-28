@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"slices"
+	"strings"
 
 	"github.com/elimity-com/scim"
 	scimerrors "github.com/elimity-com/scim/errors"
@@ -56,6 +57,12 @@ func (h UserHandler) Create(request *http.Request, attributes scim.ResourceAttri
 	if err != nil {
 		return scim.Resource{}, err
 	}
+
+	err = h.updateAliases(user, attributes)
+	if err != nil {
+		return scim.Resource{}, err
+	}
+
 	resource := userToUserResource(user)
 	resource.Attributes["entitlements"] = wantLicenses
 	return resource, nil
@@ -90,7 +97,6 @@ func (h UserHandler) Get(_ *http.Request, id string) (scim.Resource, error) {
 	if user == nil {
 		return scim.Resource{}, scimerrors.ScimErrorResourceNotFound(id)
 	}
-	slog.Info("GET /v2/Users", "user", user)
 	resource := userToUserResource(user)
 
 	licensesForUser, err := h.getLicenses(user)
@@ -136,28 +142,18 @@ func (h UserHandler) licenseToResource(licenses []Product) []map[string]interfac
 }
 
 func emailToResource(entry *admin.User) []map[string]interface{} {
-	input, ok := entry.Emails.([]interface{})
+	out := make([]map[string]interface{}, 0, len(entry.Aliases)+1)
 
-	if !ok {
-		return []map[string]interface{}{}
-	}
+	out = append(out, map[string]interface{}{
+		"primary": true,
+		"value":   entry.PrimaryEmail,
+		"type":    "work",
+	})
 
-	out := make([]map[string]interface{}, 0, len(input))
-	for _, e := range input {
-		mail := e.(map[string]interface{})
-		// Skip internal mails (i.e. <username>.test-google-a.com)
-		if slices.Contains(entry.NonEditableAliases, mail["address"].(string)) {
-			continue
-		}
-
-		primary, ok := mail["primary"]
-		if !ok {
-			primary = false
-		}
-
+	for _, alias := range entry.Aliases {
 		out = append(out, map[string]interface{}{
-			"primary": primary,
-			"value":   mail["address"],
+			"primary": false,
+			"value":   alias,
 			"type":    "work",
 		})
 	}
@@ -393,6 +389,7 @@ func resourceToUser(request *http.Request, resourceAttrs map[string]interface{})
 		Relations:     relations,
 		Organizations: organizations,
 		Phones:        googlePhones,
+		//Emails:        googleEmails,
 	}, nil
 }
 
@@ -507,9 +504,74 @@ func (h UserHandler) updateUser(request *http.Request, attributes scim.ResourceA
 		return scim.Resource{}, err
 	}
 
+	err = h.updateAliases(user, attributes)
+	if err != nil {
+		return scim.Resource{}, err
+	}
+
 	resource := userToUserResource(user)
 	resource.Attributes["entitlements"] = wantLicenses
 	return resource, nil
+}
+
+func (h UserHandler) updateAliases(user *admin.User, attributes scim.ResourceAttributes) error {
+	emails, ok := attributes["emails"].([]interface{})
+
+	if !ok {
+		return nil
+	}
+
+	existingAliases := user.Aliases
+	wantAliases := make([]string, 0, len(emails))
+	for _, e := range emails {
+		email, ok := e.(map[string]interface{})
+		if ok {
+			primary, ok := email["primary"]
+
+			if !ok || primary.(bool) {
+				continue
+			}
+
+			_, domain, found := strings.Cut(email["value"].(string), "@")
+
+			if found && domain == h.cfg.Domain {
+				wantAliases = append(wantAliases, email["value"].(string))
+			} else {
+				slog.Warn("Invalid alias address", "email", email["value"])
+			}
+		}
+	}
+
+	for _, alias := range wantAliases {
+		if slices.Contains(existingAliases, alias) {
+			continue
+		}
+
+		_, err := h.adminClient.Users.Aliases.Insert(user.Id, &admin.Alias{
+			Alias: alias,
+		}).Do()
+
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, alias := range existingAliases {
+		if slices.Contains(wantAliases, alias) {
+			continue
+		}
+
+		err := h.adminClient.Users.Aliases.Delete(user.Id, alias).Do()
+
+		if err != nil {
+			return err
+		}
+	}
+
+	// Update the user with the new state.
+	user.Aliases = wantAliases
+
+	return nil
 }
 
 func (h UserHandler) updateLicenses(user *admin.User, attributes scim.ResourceAttributes) ([]map[string]interface{}, error) {

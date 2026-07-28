@@ -16,12 +16,18 @@
         "formatted":"svc authentik",
         "givenName":"svc"
       },
+      "addresses": [],
+      "phoneNumbers": [],
       "emails": [
         { "type": "work", "primary": true, "value": "svc_authentik@dev.suse.com" }
       ],
       "custom": {},
+      "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User": {
+      },
+      "title": "",
       "urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser": {
-        "orgUnitPath": "/"
+        "orgUnitPath": "/",
+        "relations": null
       },
       "meta": {
         "location": "Users/113765969969838891919",
@@ -44,12 +50,18 @@
         "formatted":"Test Okta",
         "givenName":"Test"
       },
+      "addresses": [],
+      "phoneNumbers": [],
       "custom": {},
       "emails": [
         { "type": "work", "primary": true, "value": "testokta@dev.suse.com" }
       ],
+      "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User": {
+      },
+      "title": "",
       "urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser": {
-        "orgUnitPath": "/CW Limited Access"
+        "orgUnitPath": "/CW Limited Access",
+        "relations": null
       },
       "meta": {
         "location": "Users/104963533172021742203",

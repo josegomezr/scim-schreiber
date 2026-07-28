@@ -103,6 +103,8 @@ func (suite *SCIMUserTestSuite) TestReplaceUser() {
 	suite.mockWithRequestBody(t, "https://admin.googleapis.com/admin/directory/v1/users/testuser@dev.suse.com", 200, "replace-user-request.json", "replace-user-response.json")
 	suite.mockOk(t, "https://licensing.googleapis.com/apps/licensing/v1/product/Google-Apps/sku/1010020026/user/testuser@dev.suse.com", "get_license.json")
 
+	suite.mockOk(t, "https://admin.googleapis.com/admin/directory/v1/users/100994131692123746646/aliases", "alias.json")
+
 	gock.New("https://licensing.googleapis.com").Delete("/apps/licensing/v1/product/Google-Apps/sku/1010020026/user/testuser@dev.suse.com").Reply(http.StatusNoContent)
 
 	request, _ := http.NewRequest(http.MethodPut, "/Users/testuser@dev.suse.com", file)
