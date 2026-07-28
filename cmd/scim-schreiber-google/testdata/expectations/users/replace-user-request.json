@@ -21,6 +21,15 @@
     "givenName": "Replace"
   },
   "orgUnitPath": "/Authentik Staging",
+  "organizations": [
+    {
+      "costCenter": "1337",
+      "customType": "work",
+      "department": "Awesome department",
+      "name": "SUSE",
+      "title": "Amazing Engineer"
+    }
+  ],
   "primaryEmail": "testuser@dev.suse.com",
   "relations": [
     {

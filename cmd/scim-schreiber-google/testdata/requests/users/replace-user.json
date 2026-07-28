@@ -42,5 +42,11 @@
         "value": "manager.email@example.org"
       }
     ]
-  }
+  },
+  "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User": {
+    "organization": "SUSE",
+    "costCenter": "1337",
+    "department": "Awesome department"
+  },
+  "title": "Amazing Engineer"
 }

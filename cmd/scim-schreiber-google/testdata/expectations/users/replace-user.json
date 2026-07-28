@@ -37,6 +37,12 @@
       }
     ]
   },
+  "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User": {
+    "organization": "SUSE",
+    "costCenter": "1337",
+    "department": "Awesome department"
+  },
+  "title": "Amazing Engineer",
   "schemas": [
     "urn:ietf:params:scim:schemas:core:2.0:User",
     "urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser",

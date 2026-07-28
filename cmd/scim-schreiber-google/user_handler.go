@@ -187,6 +187,28 @@ func userToUserResource(entry *admin.User) scim.Resource {
 		"relations":   entry.Relations,
 	}
 
+	enterpriseExt := map[string]interface{}{}
+
+	title := ""
+
+	if entry.Organizations != nil {
+		organizations := entry.Organizations.([]interface{})
+		for _, orgRaw := range organizations {
+			org := orgRaw.(map[string]interface{})
+
+			if org["customType"] == "work" {
+				enterpriseExt = map[string]interface{}{
+					"organization": org["name"].(string),
+					"costCenter":   org["costCenter"].(string),
+					"department":   org["department"].(string),
+				}
+				title = org["title"].(string)
+				break
+			}
+
+		}
+	}
+
 	addresses := make([]map[string]interface{}, 0)
 	if entry.Addresses != nil {
 		for _, addr := range entry.Addresses.([]interface{}) {
@@ -211,7 +233,9 @@ func userToUserResource(entry *admin.User) scim.Resource {
 			"active":      !entry.Suspended,
 			"addresses":   addresses,
 			"custom":      entry.CustomSchemas,
+			"title":       title,
 			"urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser": googleExt,
+			"urn:ietf:params:scim:schemas:extension:enterprise:2.0:User": enterpriseExt,
 		},
 	}
 }
@@ -287,6 +311,29 @@ func resourceToUser(request *http.Request, resourceAttrs map[string]interface{})
 		}
 	}
 
+	organizations := make([]admin.UserOrganization, 0, 1)
+	if val, ok := utils.GetExtensionAttribute(resourceAttrs, "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User", "organization"); ok {
+		organization := casting.SingleValue[string](val)
+
+		costCenter := ""
+		if val, ok := utils.GetExtensionAttribute(resourceAttrs, "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User", "costCenter"); ok {
+			costCenter = casting.SingleValue[string](val)
+		}
+
+		department := ""
+		if val, ok := utils.GetExtensionAttribute(resourceAttrs, "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User", "department"); ok {
+			department = casting.SingleValue[string](val)
+		}
+
+		organizations = append(organizations, admin.UserOrganization{
+			CostCenter: costCenter,
+			CustomType: "work",
+			Department: department,
+			Name:       organization,
+			Title:      utils.GetOptionalSingleAttribute(resourceAttrs, "title"),
+		})
+	}
+
 	return &admin.User{
 		// Only update primary e-mails. Legacy aliases are managed in Google Workspace
 		PrimaryEmail: userName,
@@ -301,6 +348,7 @@ func resourceToUser(request *http.Request, resourceAttrs map[string]interface{})
 		CustomSchemas: rawRequest.Custom,
 		Addresses:     googleAddresses,
 		Relations:     relations,
+		Organizations: organizations,
 	}, nil
 }
 

@@ -47,6 +47,15 @@
   ],
   "customerId": "C00000000",
   "orgUnitPath": "/Authentik Staging",
+  "organizations": [
+    {
+      "costCenter": "1337",
+      "customType": "work",
+      "department": "Awesome department",
+      "name": "SUSE",
+      "title": "Amazing Engineer"
+    }
+  ],
   "isMailboxSetup": true,
   "includeInGlobalAddressList": true,
   "thumbnailPhotoUrl": "//lh3.googleusercontent.com/a/ACg8ocJdes_xBJbHTFtL7cKGf6i6PRc6QQSUEw75HPbQg651VNLgOA=mo",
