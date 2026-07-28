@@ -1,4 +1,13 @@
 {
+  "addresses": [
+    {
+      "locality": "City",
+      "postalCode": "123456",
+      "region": "Bavaria",
+      "streetAddress": "Streetname 1",
+      "country": "DE"
+    }
+  ],
   "active" : true,
   "displayName" : "Display Test",
   "emails" : [ {

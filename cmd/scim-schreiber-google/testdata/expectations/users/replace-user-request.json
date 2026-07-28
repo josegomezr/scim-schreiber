@@ -1,4 +1,14 @@
 {
+  "addresses": [
+    {
+      "countryCode": "DE",
+      "locality": "City",
+      "postalCode": "123456",
+      "region": "Bavaria",
+      "streetAddress": "Streetname 1",
+      "type": "work"
+    }
+  ],
   "customSchemas": {
     "Region": {
       "addressesWorkCountryCode": "DE"

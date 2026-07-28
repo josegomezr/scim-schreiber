@@ -164,10 +164,35 @@ func emailToResource(entry *admin.User) []map[string]interface{} {
 	return out
 }
 
+func googleToAddress(entry map[string]interface{}) map[string]interface{} {
+	address := map[string]interface{}{
+		"streetAddress": entry["streetAddress"],
+		"postalCode":    entry["postalCode"],
+		"locality":      entry["locality"],
+		"country":       entry["countryCode"],
+		"region":        entry["region"],
+	}
+
+	return address
+}
+
 func userToUserResource(entry *admin.User) scim.Resource {
 
 	if entry.CustomSchemas == nil {
 		entry.CustomSchemas = make(map[string]googleapi.RawMessage)
+	}
+
+	googleExt := map[string]interface{}{
+		"orgUnitPath": entry.OrgUnitPath,
+	}
+
+	addresses := make([]map[string]interface{}, 0)
+	if entry.Addresses != nil {
+		for _, addr := range entry.Addresses.([]interface{}) {
+
+			addrCast := addr.(map[string]interface{})
+			addresses = append(addresses, googleToAddress(addrCast))
+		}
 	}
 
 	return scim.Resource{
@@ -183,7 +208,7 @@ func userToUserResource(entry *admin.User) scim.Resource {
 			"displayName": entry.Name.DisplayName,
 			"userName":    entry.PrimaryEmail,
 			"active":      !entry.Suspended,
-			"orgUnitPath": entry.OrgUnitPath,
+			"addresses":   addresses,
 			"custom":      entry.CustomSchemas,
 			"urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser": googleExt,
 		},
@@ -230,6 +255,23 @@ func resourceToUser(request *http.Request, resourceAttrs map[string]interface{})
 	if val, ok := utils.GetExtensionAttribute(resourceAttrs, "urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser", "orgUnitPath"); ok {
 		orgUnitPath = casting.SingleValue[string](val)
 	}
+	googleAddresses := make([]admin.UserAddress, 0)
+
+	if _, ok := resourceAttrs["addresses"]; ok {
+		addresses := resourceAttrs["addresses"].([]interface{})
+		googleAddresses = make([]admin.UserAddress, 0, len(addresses))
+		for _, addressRaw := range addresses {
+			address := addressRaw.(map[string]interface{})
+			googleAddresses = append(googleAddresses, admin.UserAddress{
+				CountryCode:   utils.GetOptionalSingleAttribute(address, "country"),
+				Locality:      utils.GetOptionalSingleAttribute(address, "locality"),
+				PostalCode:    utils.GetOptionalSingleAttribute(address, "postalCode"),
+				Region:        utils.GetOptionalSingleAttribute(address, "region"),
+				StreetAddress: utils.GetOptionalSingleAttribute(address, "streetAddress"),
+				Type:          utils.GetOptionalSingleAttribute(address, "type"),
+			})
+		}
+	}
 
 	return &admin.User{
 		// Only update primary e-mails. Legacy aliases are managed in Google Workspace
@@ -243,6 +285,7 @@ func resourceToUser(request *http.Request, resourceAttrs map[string]interface{})
 		OrgUnitPath:   orgUnitPath,
 		Suspended:     !casting.SingleValue[bool](resourceAttrs["active"]),
 		CustomSchemas: rawRequest.Custom,
+		Addresses:     googleAddresses,
 	}, nil
 }
 

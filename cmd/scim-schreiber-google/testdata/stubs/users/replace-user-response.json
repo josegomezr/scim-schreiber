@@ -27,6 +27,15 @@
       "address": "testuser@dev.suse.com.test-google-a.com"
     }
   ],
+  "addresses": [
+    {
+      "streetAddress": "Streetname 1",
+      "locality": "City",
+      "postalCode": "123456",
+      "region": "Bavaria",
+      "countryCode": "DE"
+    }
+  ],
   "nonEditableAliases": [
     "testuser@dev.suse.com.test-google-a.com"
   ],

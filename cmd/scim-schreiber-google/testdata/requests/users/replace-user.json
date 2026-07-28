@@ -14,6 +14,16 @@
       "value": "testuser@dev.suse.com"
     }
   ],
+  "addresses": [
+    {
+      "country": "DE",
+      "locality": "City",
+      "postalCode": "123456",
+      "region": "Bavaria",
+      "streetAddress": "Streetname 1",
+      "type": "work"
+    }
+  ],
   "custom": {
     "Region" : {
       "addressesWorkCountryCode" : "DE"

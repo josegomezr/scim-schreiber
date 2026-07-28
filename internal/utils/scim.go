@@ -23,3 +23,13 @@ func GetOptionalAttribute(attributes scim.ResourceAttributes, name string) []str
 
 	return []string{value.(string)}
 }
+
+func GetOptionalSingleAttribute(attributes map[string]interface{}, name string) string {
+	value, ok := attributes[name]
+
+	if !ok {
+		return ""
+	}
+
+	return value.(string)
+}
