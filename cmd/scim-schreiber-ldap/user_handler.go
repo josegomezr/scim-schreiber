@@ -303,8 +303,8 @@ func (h UserHandler) resourceToLdap(attributes map[string]interface{}) map[strin
 		"c":               utils.GetOptionalAttribute(address, "country"),
 		"st":              utils.GetOptionalAttribute(address, "region"),
 		"communityUid":    communityUid,
-		"telephoneNumber": phones.workLdap(),
-		"mobile":          phones.mobileLdap(),
+		"telephoneNumber": phones.WorkLdap(),
+		"mobile":          phones.MobileLdap(),
 	}
 }
 

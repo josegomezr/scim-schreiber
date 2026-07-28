@@ -39,14 +39,14 @@ type Phones struct {
 	Mobile string
 }
 
-func (p Phones) workLdap() []string {
+func (p Phones) WorkLdap() []string {
 	if p.Work != "" {
 		return []string{p.Work}
 	}
 	return []string{}
 }
 
-func (p Phones) mobileLdap() []string {
+func (p Phones) MobileLdap() []string {
 	if p.Mobile != "" {
 		return []string{p.Mobile}
 	}
