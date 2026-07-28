@@ -90,7 +90,7 @@ func (h UserHandler) Get(_ *http.Request, id string) (scim.Resource, error) {
 	if user == nil {
 		return scim.Resource{}, scimerrors.ScimErrorResourceNotFound(id)
 	}
-
+	slog.Info("GET /v2/Users", "user", user)
 	resource := userToUserResource(user)
 
 	licensesForUser, err := h.getLicenses(user)
@@ -218,6 +218,30 @@ func userToUserResource(entry *admin.User) scim.Resource {
 		}
 	}
 
+	phones := make([]map[string]interface{}, 0)
+	if entry.Phones != nil {
+		for _, addr := range entry.Phones.([]interface{}) {
+
+			phoneCast := addr.(map[string]interface{})
+
+			phoneType := ""
+
+			switch phoneCast["type"] {
+			case "work":
+				phoneType = "work"
+			case "work_mobile":
+				phoneType = "mobile"
+			default:
+				continue
+			}
+
+			phones = append(phones, map[string]interface{}{
+				"type":  phoneType,
+				"value": phoneCast["value"].(string),
+			})
+		}
+	}
+
 	return scim.Resource{
 		ID:         entry.Id,
 		ExternalID: optional.NewString(entry.PrimaryEmail),
@@ -227,13 +251,14 @@ func userToUserResource(entry *admin.User) scim.Resource {
 				"givenName":  entry.Name.GivenName,
 				"formatted":  entry.Name.FullName,
 			},
-			"emails":      emailToResource(entry),
-			"displayName": entry.Name.DisplayName,
-			"userName":    entry.PrimaryEmail,
-			"active":      !entry.Suspended,
-			"addresses":   addresses,
-			"custom":      entry.CustomSchemas,
-			"title":       title,
+			"emails":       emailToResource(entry),
+			"displayName":  entry.Name.DisplayName,
+			"userName":     entry.PrimaryEmail,
+			"active":       !entry.Suspended,
+			"addresses":    addresses,
+			"custom":       entry.CustomSchemas,
+			"title":        title,
+			"phoneNumbers": phones,
 			"urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser": googleExt,
 			"urn:ietf:params:scim:schemas:extension:enterprise:2.0:User": enterpriseExt,
 		},
@@ -334,6 +359,24 @@ func resourceToUser(request *http.Request, resourceAttrs map[string]interface{})
 		})
 	}
 
+	phones := utils.GetPhones(resourceAttrs)
+
+	googlePhones := make([]admin.UserPhone, 0, 2)
+
+	if phones.Mobile != "" {
+		googlePhones = append(googlePhones, admin.UserPhone{
+			Type:  "work_mobile",
+			Value: phones.Mobile,
+		})
+	}
+
+	if phones.Work != "" {
+		googlePhones = append(googlePhones, admin.UserPhone{
+			Type:  "work",
+			Value: phones.Work,
+		})
+	}
+
 	return &admin.User{
 		// Only update primary e-mails. Legacy aliases are managed in Google Workspace
 		PrimaryEmail: userName,
@@ -349,6 +392,7 @@ func resourceToUser(request *http.Request, resourceAttrs map[string]interface{})
 		Addresses:     googleAddresses,
 		Relations:     relations,
 		Organizations: organizations,
+		Phones:        googlePhones,
 	}, nil
 }
 

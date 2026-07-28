@@ -30,6 +30,16 @@
       "title": "Amazing Engineer"
     }
   ],
+  "phones": [
+    {
+      "type": "work_mobile",
+      "value": "+1 234"
+    },
+    {
+      "type": "work",
+      "value": "+1 456"
+    }
+  ],
   "primaryEmail": "testuser@dev.suse.com",
   "relations": [
     {
