@@ -2,6 +2,7 @@
   "addresses": [
     {
       "countryCode": "DE",
+      "formatted": "Streetname 1, City, 123456, Bavaria, DE",
       "locality": "City",
       "postalCode": "123456",
       "region": "Bavaria",
@@ -43,6 +44,12 @@
       "division": "IT Platform Engineering"
     }
   },
+  "externalIds": [
+    {
+      "type": "organization",
+      "value": "123"
+    }
+  ],
   "name": {
     "displayName": "Display Test",
     "familyName": "User",

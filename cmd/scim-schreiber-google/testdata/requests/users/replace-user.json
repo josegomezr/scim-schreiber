@@ -62,7 +62,8 @@
     "organization": "SUSE",
     "costCenter": "1337",
     "department": "Awesome department",
-    "division": "IT Platform Engineering"
+    "division": "IT Platform Engineering",
+    "employeeNumber": "123"
   },
   "title": "Amazing Engineer",
   "userType": "Employee"

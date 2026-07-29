@@ -20,14 +20,16 @@
       "locality":  "Bulgaria OOH",
       "postalCode": "00000",
       "region": "Sofia",
-      "streetAddress": "NA"
+      "streetAddress": "NA",
+      "type": "work"
     },
     {
       "country": null,
       "locality":  null,
       "postalCode": null,
       "region": null,
-      "streetAddress": null
+      "streetAddress": null,
+      "type": "home"
     }
   ],
   "phoneNumbers": [],

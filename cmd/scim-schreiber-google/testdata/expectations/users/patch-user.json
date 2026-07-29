@@ -6,7 +6,8 @@
       "postalCode": "123456",
       "region": "Bavaria",
       "streetAddress": "Streetname 1",
-      "country": "DE"
+      "country": "DE",
+      "type": "work"
     }
   ],
   "phoneNumbers": [
@@ -60,7 +61,8 @@
     "organization": "SUSE",
     "costCenter": "1337",
     "department": "Awesome department",
-    "division": "IT Platform Engineering"
+    "division": "IT Platform Engineering",
+    "employeeNumber": "123"
   },
   "title": "Amazing Engineer",
   "schemas": [
