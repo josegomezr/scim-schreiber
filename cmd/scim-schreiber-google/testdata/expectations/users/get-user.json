@@ -14,6 +14,23 @@
     "formatted": "FirstName LastName",
     "givenName": "FirstName"
   },
+  "addresses": [
+    {
+      "country": "BG",
+      "locality":  "Bulgaria OOH",
+      "postalCode": "00000",
+      "region": "Sofia",
+      "streetAddress": "NA"
+    },
+    {
+      "country": null,
+      "locality":  null,
+      "postalCode": null,
+      "region": null,
+      "streetAddress": null
+    }
+  ],
+  "phoneNumbers": [],
   "emails": [
     {
       "type": "work",
@@ -31,51 +48,34 @@
       "value": "1000@example.com"
     }
   ],
-  "orgUnitPath": "/",
+  "urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser": {
+    "orgUnitPath": "/",
+    "relations": [
+      {
+        "type": "manager",
+        "value":  "manager.name@example.com"
+      }
+    ],
+    "isSupervisor": true,
+    "jobFamily": "IT Management",
+    "l3leader": "L3 Leader Name",
+    "office": "BGOOH - Out of Home: Bulgaria",
+    "workLocationType": "Home-Based"
+  },
+  "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User": {
+    "organization": "SUSE",
+    "costCenter": "000",
+    "department": "Finance, IT, Procurement & IR",
+    "division": "Group IT EngInfra"
+  },
+  "title": "Team Lead",
+  "userType": "Employee",
   "entitlements": [
     {
       "type": "license",
       "value": "Google Workspace Enterprise Standard"
     }
   ],
-  "custom": {
-    "User1921": {
-      "isSupervisor": true
-    },
-    "User2471": {
-      "workLocationType": "Home-Based"
-    },
-    "User7951": {
-      "division": "Group IT EngInfra"
-    },
-    "User": {
-      "userType": "Employee"
-    },
-    "ProxyAddresses": {
-      "ProxyAddresses": [
-        {
-          "type": "work",
-          "value": "1000@example.com"
-        },
-        {
-          "type": "work",
-          "value": "svc_test@example.com"
-        }
-      ]
-    },
-    "Region": {
-      "addressesWorkCountryCode": "BG"
-    },
-    "Region7281": {
-      "Office": "BGOOH - Out of Home: Bulgaria"
-    },
-    "Job_Family": {
-      "jobfamily5241": "IT Management"
-    },
-    "L3_Leader": {
-      "L3_Leader": "L3 Leader Name"
-    }
-  },
   "meta": {
     "location": "Users/104965396198408263080",
     "resourceType": "User"

@@ -17,7 +17,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/josegomezr/scim-schreiber-ldap/cmd/scim-schreiber-ldap/testhelpers"
-	"github.com/josegomezr/scim-schreiber-ldap/internal/server"
 )
 
 import _ "embed"
@@ -64,7 +63,7 @@ func (suite *SCIMGroupTestSuite) SetupSuite() {
 	s, err := createSCIMServer(cfg, client, license, nil)
 	require.NoError(suite.T(), err)
 
-	suite.server = server.FlattenPatchMiddleware(s)
+	suite.server = s
 }
 
 func (suite *SCIMGroupTestSuite) TestCreateGroup() {

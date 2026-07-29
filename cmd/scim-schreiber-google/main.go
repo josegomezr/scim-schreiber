@@ -50,6 +50,12 @@ func main() {
 		return
 	}
 
+	err = SyncSchemas(adminClient)
+	if err != nil {
+		slog.Error("Failed to sync schema", "err", err)
+		return
+	}
+
 	scimServer, err := createSCIMServer(cfg, adminClient, licenseClient, NewProductInformationFromFile("products.yaml"))
 
 	if err != nil {
@@ -72,6 +78,7 @@ func createTokenSource(ctx context.Context, cfg *Config) (option.ClientOption, e
 		admin.AdminDirectoryGroupScope,
 		admin.AdminDirectoryOrgunitScope,
 		licensing.AppsLicensingScope,
+		admin.AdminDirectoryUserschemaScope,
 	}
 
 	config, err := google.JWTConfigFromJSON(b, scopes...)

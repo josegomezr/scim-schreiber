@@ -52,13 +52,17 @@ func NewSCIMServer(userHandler scim.ResourceHandler, groupHandler scim.ResourceH
 
 	groupExtensions = append(groupExtensions, []scim.SchemaExtension{}...)
 
+	userSchema := schema.CoreUserSchema()
+	userSchema.Attributes = append(userSchema.Attributes, schema.SchemasAttributes())
+	userSchema.Attributes = append(userSchema.Attributes, schema.CommonAttributes()...)
+
 	resourceTypes := []scim.ResourceType{
 		{
 			ID:               optional.NewString("User"),
 			Name:             "User",
 			Endpoint:         "/Users",
 			Description:      optional.NewString("User Account"),
-			Schema:           schema.CoreUserSchema(),
+			Schema:           userSchema,
 			SchemaExtensions: userExtensions,
 			Handler:          userHandler,
 		},

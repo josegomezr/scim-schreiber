@@ -1,7 +1,46 @@
 {
+  "addresses": [
+    {
+      "countryCode": "DE",
+      "locality": "City",
+      "postalCode": "123456",
+      "region": "Bavaria",
+      "streetAddress": "Streetname 1",
+      "type": "work"
+    }
+  ],
   "customSchemas": {
+    "Job_Family": {
+      "jobfamily5241": "IT Management"
+    },
+    "L3_Leader": {
+      "L3_Leader": "L3 lead"
+    },
+    "ProxyAddresses": {
+      "ProxyAddresses": [
+        {
+          "type": "work",
+          "value": "testuser-alias23@dev.suse.com"
+        }
+      ]
+    },
     "Region": {
       "addressesWorkCountryCode": "DE"
+    },
+    "Region7281": {
+      "Office": "CZOOH - Out of Home: Czech Republic"
+    },
+    "User": {
+      "userType": "Employee"
+    },
+    "User1921": {
+      "isSupervisor": true
+    },
+    "User2471": {
+      "workLocationType": "Home-Based"
+    },
+    "User7951": {
+      "division": "IT Platform Engineering"
     }
   },
   "name": {
@@ -11,5 +50,30 @@
     "givenName": "Replace"
   },
   "orgUnitPath": "/Authentik Staging",
-  "primaryEmail": "testuser@dev.suse.com"
+  "organizations": [
+    {
+      "costCenter": "1337",
+      "customType": "work",
+      "department": "Awesome department",
+      "name": "SUSE",
+      "title": "Amazing Engineer"
+    }
+  ],
+  "phones": [
+    {
+      "type": "work_mobile",
+      "value": "+1 234"
+    },
+    {
+      "type": "work",
+      "value": "+1 456"
+    }
+  ],
+  "primaryEmail": "testuser@dev.suse.com",
+  "relations": [
+    {
+      "type": "manager",
+      "value": "manager.email@example.org"
+    }
+  ]
 }

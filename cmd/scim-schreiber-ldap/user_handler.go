@@ -270,54 +270,6 @@ func filterChanged(replaces map[string][]string, entry *ldap.Entry) map[string][
 	}
 	return cleaned_replaces
 }
-
-type Phones struct {
-	work   string
-	mobile string
-}
-
-func (p Phones) workLdap() []string {
-	if p.work != "" {
-		return []string{p.work}
-	}
-	return []string{}
-}
-
-func (p Phones) mobileLdap() []string {
-	if p.mobile != "" {
-		return []string{p.mobile}
-	}
-	return []string{}
-}
-
-func getPhones(attributes map[string]interface{}) Phones {
-	phones := Phones{}
-
-	if telephones, ok := attributes["phoneNumbers"]; ok {
-		for _, phone := range telephones.([]interface{}) {
-			phoneEntry := phone.(map[string]interface{})
-			phoneNr, ok := phoneEntry["value"].(string)
-			if !ok {
-				continue
-			}
-			phoneType, ok := phoneEntry["type"].(string)
-			if !ok {
-				continue
-			}
-			switch phoneType {
-			case "work":
-				phones.work = phoneNr
-				break
-			case "mobile":
-				phones.mobile = phoneNr
-				break
-			}
-		}
-	}
-
-	return phones
-}
-
 func (h UserHandler) resourceToLdap(attributes map[string]interface{}) map[string][]string {
 	s := scimMailToLdap(attributes)
 
@@ -332,7 +284,7 @@ func (h UserHandler) resourceToLdap(attributes map[string]interface{}) map[strin
 	sshKeys := utils.GetOptionalExtensionAttributeValues(attributes, "urn:ietf:params:scim:schemas:extension:suse:2.0:User", "sshPublicKey")
 	communityUid := utils.GetOptionalExtensionAttributeValue(attributes, "urn:ietf:params:scim:schemas:extension:suse:2.0:User", "communityUid")
 
-	phones := getPhones(attributes)
+	phones := utils.GetPhones(attributes)
 
 	// avoid appending this dynamically. Every field should always be defined so that removals work too.
 	return map[string][]string{
@@ -351,8 +303,8 @@ func (h UserHandler) resourceToLdap(attributes map[string]interface{}) map[strin
 		"c":               utils.GetOptionalAttribute(address, "country"),
 		"st":              utils.GetOptionalAttribute(address, "region"),
 		"communityUid":    communityUid,
-		"telephoneNumber": phones.workLdap(),
-		"mobile":          phones.mobileLdap(),
+		"telephoneNumber": phones.WorkLdap(),
+		"mobile":          phones.MobileLdap(),
 	}
 }
 

@@ -24,6 +24,8 @@ var SchemaExtensionGoogleCloudIdentityGroup = schema.Schema{
 	},
 }
 
+const SCHEMA_GOOGLE_USER = "urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser"
+
 // this is a custom extension, as Google does not publish one containing all their user attributes
 var SchemaExtensionSUSEGoogleUser = schema.Schema{
 	ID:          "urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser",
@@ -32,6 +34,52 @@ var SchemaExtensionSUSEGoogleUser = schema.Schema{
 	Attributes: []schema.CoreAttribute{
 		schema.SimpleCoreAttribute(schema.SimpleStringParams(schema.StringParams{
 			Name:       "orgUnitPath",
+			Required:   false,
+			Uniqueness: schema.AttributeUniquenessNone(),
+			Mutability: schema.AttributeMutabilityReadWrite(),
+		})),
+		schema.ComplexCoreAttribute(schema.ComplexParams{
+			Name:        "relations",
+			Required:    false,
+			MultiValued: true,
+			Uniqueness:  schema.AttributeUniquenessNone(),
+			Mutability:  schema.AttributeMutabilityReadWrite(),
+			SubAttributes: []schema.SimpleParams{
+				schema.SimpleStringParams(schema.StringParams{
+					Name:     "type",
+					Required: true,
+				}),
+				schema.SimpleStringParams(schema.StringParams{
+					Name:     "value",
+					Required: true,
+				}),
+			},
+		}),
+		schema.SimpleCoreAttribute(schema.SimpleBooleanParams(schema.BooleanParams{
+			Name:       "isSupervisor",
+			Required:   false,
+			Mutability: schema.AttributeMutabilityReadWrite(),
+		})),
+		schema.SimpleCoreAttribute(schema.SimpleStringParams(schema.StringParams{
+			Name:       "workLocationType",
+			Required:   false,
+			Uniqueness: schema.AttributeUniquenessNone(),
+			Mutability: schema.AttributeMutabilityReadWrite(),
+		})),
+		schema.SimpleCoreAttribute(schema.SimpleStringParams(schema.StringParams{
+			Name:       "office",
+			Required:   false,
+			Uniqueness: schema.AttributeUniquenessNone(),
+			Mutability: schema.AttributeMutabilityReadWrite(),
+		})),
+		schema.SimpleCoreAttribute(schema.SimpleStringParams(schema.StringParams{
+			Name:       "l3leader",
+			Required:   false,
+			Uniqueness: schema.AttributeUniquenessNone(),
+			Mutability: schema.AttributeMutabilityReadWrite(),
+		})),
+		schema.SimpleCoreAttribute(schema.SimpleStringParams(schema.StringParams{
+			Name:       "jobFamily",
 			Required:   false,
 			Uniqueness: schema.AttributeUniquenessNone(),
 			Mutability: schema.AttributeMutabilityReadWrite(),

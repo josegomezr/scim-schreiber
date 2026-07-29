@@ -16,11 +16,25 @@
         "formatted":"svc authentik",
         "givenName":"svc"
       },
+      "addresses": [],
+      "phoneNumbers": [],
       "emails": [
         { "type": "work", "primary": true, "value": "svc_authentik@dev.suse.com" }
       ],
-      "custom": {},
-      "orgUnitPath":"/",
+      "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User": {
+        "division": ""
+      },
+      "title": "",
+      "userType": "",
+      "urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser": {
+        "orgUnitPath": "/",
+        "relations": null,
+        "isSupervisor": false,
+        "jobFamily": "",
+        "l3leader": "",
+        "office": "",
+        "workLocationType": ""
+      },
       "meta": {
         "location": "Users/113765969969838891919",
         "resourceType":"User"
@@ -42,11 +56,25 @@
         "formatted":"Test Okta",
         "givenName":"Test"
       },
-      "custom": {},
+      "addresses": [],
+      "phoneNumbers": [],
       "emails": [
         { "type": "work", "primary": true, "value": "testokta@dev.suse.com" }
       ],
-      "orgUnitPath":"/CW Limited Access",
+      "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User": {
+        "division": ""
+      },
+      "title": "",
+      "userType": "",
+      "urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser": {
+        "orgUnitPath": "/CW Limited Access",
+        "relations": null,
+        "isSupervisor": false,
+        "jobFamily": "",
+        "l3leader": "",
+        "office": "",
+        "workLocationType": ""
+      },
       "meta": {
         "location": "Users/104963533172021742203",
         "resourceType":"User"

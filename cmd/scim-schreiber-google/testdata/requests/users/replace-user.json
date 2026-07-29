@@ -12,6 +12,21 @@
       "primary": true,
       "type": "work",
       "value": "testuser@dev.suse.com"
+    },
+    {
+      "primary": false,
+      "type": "work",
+      "value": "testuser-alias23@dev.suse.com"
+    }
+  ],
+  "addresses": [
+    {
+      "country": "DE",
+      "locality": "City",
+      "postalCode": "123456",
+      "region": "Bavaria",
+      "streetAddress": "Streetname 1",
+      "type": "work"
     }
   ],
   "custom": {
@@ -19,12 +34,41 @@
       "addressesWorkCountryCode" : "DE"
     }
   },
+  "phoneNumbers": [
+    {
+      "type": "mobile",
+      "value": "+1 234"
+    },
+    {
+      "type": "work",
+      "value": "+1 456"
+    }
+  ],
   "schemas": [
     "urn:ietf:params:scim:schemas:core:2.0:User",
     "urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser",
     "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"
   ],
   "urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser": {
-    "orgUnitPath": "/Authentik Staging"
-  }
+    "orgUnitPath": "/Authentik Staging",
+    "relations": [
+      {
+        "type": "manager",
+        "value": "manager.email@example.org"
+      }
+    ],
+    "jobFamily": "IT Management",
+    "l3leader": "L3 lead",
+    "office": "CZOOH - Out of Home: Czech Republic",
+    "workLocationType": "Home-Based",
+    "isSupervisor": true
+  },
+  "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User": {
+    "organization": "SUSE",
+    "costCenter": "1337",
+    "department": "Awesome department",
+    "division": "IT Platform Engineering"
+  },
+  "title": "Amazing Engineer",
+  "userType": "Employee"
 }

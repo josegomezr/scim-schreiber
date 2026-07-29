@@ -1,15 +1,13 @@
 package main
 
 import (
-	"bytes"
 	"crypto/rand"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"slices"
+	"strings"
 
 	"github.com/elimity-com/scim"
 	scimerrors "github.com/elimity-com/scim/errors"
@@ -31,10 +29,10 @@ type UserHandler struct {
 	productInformation *ProductInformation
 }
 
-func (h UserHandler) Create(request *http.Request, attributes scim.ResourceAttributes) (scim.Resource, error) {
+func (h UserHandler) Create(_ *http.Request, attributes scim.ResourceAttributes) (scim.Resource, error) {
 	slog.Info("POST /v2/Users", "request", attributes)
 
-	userRequest, err := resourceToUser(request, attributes)
+	userRequest, err := h.resourceToUser(attributes)
 
 	if err != nil {
 		return scim.Resource{}, err
@@ -56,6 +54,12 @@ func (h UserHandler) Create(request *http.Request, attributes scim.ResourceAttri
 	if err != nil {
 		return scim.Resource{}, err
 	}
+
+	err = h.updateAliases(user, attributes)
+	if err != nil {
+		return scim.Resource{}, err
+	}
+
 	resource := userToUserResource(user)
 	resource.Attributes["entitlements"] = wantLicenses
 	return resource, nil
@@ -90,7 +94,6 @@ func (h UserHandler) Get(_ *http.Request, id string) (scim.Resource, error) {
 	if user == nil {
 		return scim.Resource{}, scimerrors.ScimErrorResourceNotFound(id)
 	}
-
 	resource := userToUserResource(user)
 
 	licensesForUser, err := h.getLicenses(user)
@@ -136,39 +139,116 @@ func (h UserHandler) licenseToResource(licenses []Product) []map[string]interfac
 }
 
 func emailToResource(entry *admin.User) []map[string]interface{} {
-	input, ok := entry.Emails.([]interface{})
+	out := make([]map[string]interface{}, 0, len(entry.Aliases)+1)
 
-	if !ok {
-		return []map[string]interface{}{}
-	}
+	out = append(out, map[string]interface{}{
+		"primary": true,
+		"value":   entry.PrimaryEmail,
+		"type":    "work",
+	})
 
-	out := make([]map[string]interface{}, 0, len(input))
-	for _, e := range input {
-		mail := e.(map[string]interface{})
-		// Skip internal mails (i.e. <username>.test-google-a.com)
-		if slices.Contains(entry.NonEditableAliases, mail["address"].(string)) {
-			continue
-		}
-
-		primary, ok := mail["primary"]
-		if !ok {
-			primary = false
-		}
-
+	for _, alias := range entry.Aliases {
 		out = append(out, map[string]interface{}{
-			"primary": primary,
-			"value":   mail["address"],
+			"primary": false,
+			"value":   alias,
 			"type":    "work",
 		})
 	}
 	return out
 }
 
+func googleToAddress(entry map[string]interface{}) map[string]interface{} {
+	address := map[string]interface{}{
+		"streetAddress": entry["streetAddress"],
+		"postalCode":    entry["postalCode"],
+		"locality":      entry["locality"],
+		"country":       entry["countryCode"],
+		"region":        entry["region"],
+	}
+
+	return address
+}
+
 func userToUserResource(entry *admin.User) scim.Resource {
 
-	if entry.CustomSchemas == nil {
-		entry.CustomSchemas = make(map[string]googleapi.RawMessage)
+	enterpriseExt := map[string]interface{}{}
+
+	title := ""
+
+	if entry.Organizations != nil {
+		organizations := entry.Organizations.([]interface{})
+		for _, orgRaw := range organizations {
+			org := orgRaw.(map[string]interface{})
+
+			if org["customType"] == "work" {
+				enterpriseExt = map[string]interface{}{
+					"organization": org["name"].(string),
+					"costCenter":   org["costCenter"].(string),
+					"department":   org["department"].(string),
+				}
+				title = org["title"].(string)
+				break
+			}
+
+		}
 	}
+
+	addresses := make([]map[string]interface{}, 0)
+	if entry.Addresses != nil {
+		for _, addr := range entry.Addresses.([]interface{}) {
+
+			addrCast := addr.(map[string]interface{})
+			addresses = append(addresses, googleToAddress(addrCast))
+		}
+	}
+
+	phones := make([]map[string]interface{}, 0)
+	if entry.Phones != nil {
+		for _, addr := range entry.Phones.([]interface{}) {
+
+			phoneCast := addr.(map[string]interface{})
+
+			phoneType := ""
+
+			switch phoneCast["type"] {
+			case "work":
+				phoneType = "work"
+			case "work_mobile":
+				phoneType = "mobile"
+			default:
+				continue
+			}
+
+			phones = append(phones, map[string]interface{}{
+				"type":  phoneType,
+				"value": phoneCast["value"].(string),
+			})
+		}
+	}
+
+	customFields := CustomFields{}
+
+	if entry.CustomSchemas != nil {
+		c, err := UnmarshalGoogleApi(entry.CustomSchemas)
+
+		if err != nil {
+			slog.Error("Could not unmarshal custom fields", "error", err)
+		} else {
+			customFields = c
+		}
+	}
+
+	googleExt := map[string]interface{}{
+		"orgUnitPath":      entry.OrgUnitPath,
+		"relations":        entry.Relations,
+		"isSupervisor":     customFields.IsSupervisor.Value,
+		"jobFamily":        customFields.JobFamily.Value,
+		"l3leader":         customFields.L3Leader.Value,
+		"workLocationType": customFields.WorkLocationType.Value,
+		"office":           customFields.Office.Value,
+	}
+
+	enterpriseExt["division"] = customFields.Division.Value
 
 	return scim.Resource{
 		ID:         entry.Id,
@@ -179,12 +259,16 @@ func userToUserResource(entry *admin.User) scim.Resource {
 				"givenName":  entry.Name.GivenName,
 				"formatted":  entry.Name.FullName,
 			},
-			"emails":      emailToResource(entry),
-			"displayName": entry.Name.DisplayName,
-			"userName":    entry.PrimaryEmail,
-			"active":      !entry.Suspended,
-			"orgUnitPath": entry.OrgUnitPath,
-			"custom":      entry.CustomSchemas,
+			"emails":       emailToResource(entry),
+			"displayName":  entry.Name.DisplayName,
+			"userName":     entry.PrimaryEmail,
+			"active":       !entry.Suspended,
+			"addresses":    addresses,
+			"title":        title,
+			"phoneNumbers": phones,
+			"userType":     customFields.UserType.Value,
+			"urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser": googleExt,
+			"urn:ietf:params:scim:schemas:extension:enterprise:2.0:User": enterpriseExt,
 		},
 	}
 }
@@ -193,7 +277,7 @@ type RawRequest struct {
 	Custom map[string]googleapi.RawMessage `json:"custom"`
 }
 
-func resourceToUser(request *http.Request, resourceAttrs map[string]interface{}) (*admin.User, error) {
+func (h UserHandler) resourceToUser(resourceAttrs map[string]interface{}) (*admin.User, error) {
 	nameMap := casting.SingleValue[map[string]interface{}](resourceAttrs["name"])
 
 	emails, ok := resourceAttrs["emails"].([]interface{})
@@ -220,14 +304,162 @@ func resourceToUser(request *http.Request, resourceAttrs map[string]interface{})
 		return nil, scimerrors.ScimErrorBadRequest("Need a primary email to match username")
 	}
 
-	rawRequest, err := getRawRequest(request)
-	if err != nil {
-		return nil, err
+	orgUnitPath := ""
+	if val, ok := utils.GetExtensionAttribute(resourceAttrs, SCHEMA_GOOGLE_USER, "orgUnitPath"); ok {
+		orgUnitPath = casting.SingleValue[string](val)
+	}
+	googleAddresses := make([]admin.UserAddress, 0)
+
+	if _, ok := resourceAttrs["addresses"]; ok {
+		addresses := resourceAttrs["addresses"].([]interface{})
+		googleAddresses = make([]admin.UserAddress, 0, len(addresses))
+		for _, addressRaw := range addresses {
+			address := addressRaw.(map[string]interface{})
+			googleAddresses = append(googleAddresses, admin.UserAddress{
+				CountryCode:   utils.GetOptionalSingleAttribute(address, "country"),
+				Locality:      utils.GetOptionalSingleAttribute(address, "locality"),
+				PostalCode:    utils.GetOptionalSingleAttribute(address, "postalCode"),
+				Region:        utils.GetOptionalSingleAttribute(address, "region"),
+				StreetAddress: utils.GetOptionalSingleAttribute(address, "streetAddress"),
+				Type:          utils.GetOptionalSingleAttribute(address, "type"),
+			})
+		}
 	}
 
-	orgUnitPath := ""
-	if val, ok := utils.GetExtensionAttribute(resourceAttrs, "urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser", "orgUnitPath"); ok {
-		orgUnitPath = casting.SingleValue[string](val)
+	relations := make([]admin.UserRelation, 0)
+	if val, ok := utils.GetExtensionAttribute(resourceAttrs, SCHEMA_GOOGLE_USER, "relations"); ok {
+		relationsRaw := val.([]interface{})
+
+		for _, relationRaw := range relationsRaw {
+			relation := relationRaw.(map[string]interface{})
+			relations = append(relations, admin.UserRelation{
+				Type:  relation["type"].(string),
+				Value: relation["value"].(string),
+			})
+		}
+	}
+
+	organizations := make([]admin.UserOrganization, 0, 1)
+	if val, ok := utils.GetExtensionAttribute(resourceAttrs, model.SCHEMA_ENTERPRISE_USER, "organization"); ok {
+		organization := casting.SingleValue[string](val)
+
+		costCenter := ""
+		if val, ok := utils.GetExtensionAttribute(resourceAttrs, model.SCHEMA_ENTERPRISE_USER, "costCenter"); ok {
+			costCenter = casting.SingleValue[string](val)
+		}
+
+		department := ""
+		if val, ok := utils.GetExtensionAttribute(resourceAttrs, model.SCHEMA_ENTERPRISE_USER, "department"); ok {
+			department = casting.SingleValue[string](val)
+		}
+
+		organizations = append(organizations, admin.UserOrganization{
+			CostCenter: costCenter,
+			CustomType: "work",
+			Department: department,
+			Name:       organization,
+			Title:      utils.GetOptionalSingleAttribute(resourceAttrs, "title"),
+		})
+	}
+
+	phones := utils.GetPhones(resourceAttrs)
+
+	googlePhones := make([]admin.UserPhone, 0, 2)
+
+	if phones.Mobile != "" {
+		googlePhones = append(googlePhones, admin.UserPhone{
+			Type:  "work_mobile",
+			Value: phones.Mobile,
+		})
+	}
+
+	if phones.Work != "" {
+		googlePhones = append(googlePhones, admin.UserPhone{
+			Type:  "work",
+			Value: phones.Work,
+		})
+	}
+
+	division := ""
+	if val, ok := utils.GetExtensionAttribute(resourceAttrs, model.SCHEMA_ENTERPRISE_USER, "division"); ok {
+		division = casting.SingleValue[string](val)
+	}
+
+	country := ""
+	// Just take the first address to determine this.
+	if len(googleAddresses) > 0 {
+		country = googleAddresses[0].CountryCode
+	}
+
+	isSupervisor := false
+	if val, ok := utils.GetExtensionAttribute(resourceAttrs, SCHEMA_GOOGLE_USER, "isSupervisor"); ok {
+		isSupervisor = val.(bool)
+	}
+
+	jobFamily := ""
+	if val, ok := utils.GetExtensionAttribute(resourceAttrs, SCHEMA_GOOGLE_USER, "jobFamily"); ok {
+		jobFamily = casting.SingleValue[string](val)
+	}
+
+	l3leader := ""
+	if val, ok := utils.GetExtensionAttribute(resourceAttrs, SCHEMA_GOOGLE_USER, "l3leader"); ok {
+		l3leader = casting.SingleValue[string](val)
+	}
+
+	workLocationType := ""
+	if val, ok := utils.GetExtensionAttribute(resourceAttrs, SCHEMA_GOOGLE_USER, "workLocationType"); ok {
+		workLocationType = casting.SingleValue[string](val)
+	}
+
+	office := ""
+	if val, ok := utils.GetExtensionAttribute(resourceAttrs, SCHEMA_GOOGLE_USER, "office"); ok {
+		office = casting.SingleValue[string](val)
+	}
+
+	aliases := h.getAliases(resourceAttrs)
+	proxyAddr := make([]ProxyAddress, 0, len(aliases))
+
+	for _, alias := range aliases {
+		proxyAddr = append(proxyAddr, ProxyAddress{
+			Type:  "work",
+			Value: alias,
+		})
+	}
+
+	custom := CustomFields{
+		JobFamily: JobFamily{
+			Value: jobFamily,
+		},
+		L3Leader: L3Leader{
+			Value: l3leader,
+		},
+		ProxyAddresses: ProxyAddresses{
+			ProxyAddresses: proxyAddr,
+		},
+		Region: Region{
+			CountryCode: country,
+		},
+		Office: Office{
+			Value: office,
+		},
+		UserType: UserType{
+			Value: utils.GetOptionalSingleAttribute(resourceAttrs, "userType"),
+		},
+		IsSupervisor: IsSupervisor{
+			Value: isSupervisor,
+		},
+		WorkLocationType: WorkLocationType{
+			Value: workLocationType,
+		},
+		Division: Division{
+			Value: division,
+		},
+	}
+
+	bytes, err := custom.MarshalGoogleApi()
+
+	if err != nil {
+		return nil, err
 	}
 
 	return &admin.User{
@@ -241,31 +473,13 @@ func resourceToUser(request *http.Request, resourceAttrs map[string]interface{})
 		},
 		OrgUnitPath:   orgUnitPath,
 		Suspended:     !casting.SingleValue[bool](resourceAttrs["active"]),
-		CustomSchemas: rawRequest.Custom,
+		CustomSchemas: bytes,
+		Addresses:     googleAddresses,
+		Relations:     relations,
+		Organizations: organizations,
+		Phones:        googlePhones,
+		//Emails:        googleEmails,
 	}, nil
-}
-
-// Need to grab the custom fields from the raw request because we don't know the field names at compile time.
-// Thus we can't describe these fields in the schema and the scim library drops everything that is not described in the schema.
-func getRawRequest(request *http.Request) (*RawRequest, error) {
-	// This works because the scim library replaces the input stream with a byte buffer.
-	raw, err := io.ReadAll(request.Body)
-	if err != nil {
-		slog.Warn("Error reading raw request body", "error", err)
-		return nil, err
-	}
-
-	rawRequest := RawRequest{}
-
-	decoder := json.NewDecoder(bytes.NewReader(raw))
-	decoder.UseNumber()
-	err = decoder.Decode(&rawRequest)
-
-	if err != nil {
-		slog.Warn("Error decoding raw request body", "error", err)
-		return nil, err
-	}
-	return &rawRequest, nil
 }
 
 func (h UserHandler) GetAll(_ *http.Request, params scim.ListRequestParams) (scim.Page, error) {
@@ -305,7 +519,7 @@ func isEmptyPath(path *filter.Path) bool {
 	return path == nil || path.String() == ""
 }
 
-func (h UserHandler) Patch(request *http.Request, id string, operations []scim.PatchOperation) (scim.Resource, error) {
+func (h UserHandler) Patch(_ *http.Request, id string, operations []scim.PatchOperation) (scim.Resource, error) {
 	slog.Info("PATCH /v2/Users", "id", id, "operations", operations)
 
 	if len(operations) != 1 {
@@ -327,18 +541,18 @@ func (h UserHandler) Patch(request *http.Request, id string, operations []scim.P
 		return scim.Resource{}, scimerrors.ScimErrorBadRequest("Value must be a JSON object")
 	}
 
-	return h.updateUser(request, attributes, id)
+	return h.updateUser(attributes, id)
 
 }
 
-func (h UserHandler) Replace(request *http.Request, id string, attributes scim.ResourceAttributes) (scim.Resource, error) {
+func (h UserHandler) Replace(_ *http.Request, id string, attributes scim.ResourceAttributes) (scim.Resource, error) {
 	slog.Info("PUT /v2/Users", "id", id, "attributes", attributes)
 
-	return h.updateUser(request, attributes, id)
+	return h.updateUser(attributes, id)
 }
 
-func (h UserHandler) updateUser(request *http.Request, attributes scim.ResourceAttributes, id string) (scim.Resource, error) {
-	userRequest, err := resourceToUser(request, attributes)
+func (h UserHandler) updateUser(attributes scim.ResourceAttributes, id string) (scim.Resource, error) {
+	userRequest, err := h.resourceToUser(attributes)
 
 	if err != nil {
 		return scim.Resource{}, err
@@ -356,9 +570,80 @@ func (h UserHandler) updateUser(request *http.Request, attributes scim.ResourceA
 		return scim.Resource{}, err
 	}
 
+	err = h.updateAliases(user, attributes)
+	if err != nil {
+		return scim.Resource{}, err
+	}
+
 	resource := userToUserResource(user)
 	resource.Attributes["entitlements"] = wantLicenses
 	return resource, nil
+}
+
+func (h UserHandler) getAliases(attributes scim.ResourceAttributes) []string {
+	emails, ok := attributes["emails"].([]interface{})
+
+	if !ok {
+		return nil
+	}
+
+	wantAliases := make([]string, 0, len(emails))
+	for _, e := range emails {
+		email, ok := e.(map[string]interface{})
+		if ok {
+			primary, ok := email["primary"]
+
+			if !ok || primary.(bool) {
+				continue
+			}
+
+			_, domain, found := strings.Cut(email["value"].(string), "@")
+
+			if found && domain == h.cfg.Domain {
+				wantAliases = append(wantAliases, email["value"].(string))
+			} else {
+				slog.Warn("Invalid alias address", "email", email["value"])
+			}
+		}
+	}
+	return wantAliases
+}
+
+func (h UserHandler) updateAliases(user *admin.User, attributes scim.ResourceAttributes) error {
+
+	existingAliases := user.Aliases
+	wantAliases := h.getAliases(attributes)
+
+	for _, alias := range wantAliases {
+		if slices.Contains(existingAliases, alias) {
+			continue
+		}
+
+		_, err := h.adminClient.Users.Aliases.Insert(user.Id, &admin.Alias{
+			Alias: alias,
+		}).Do()
+
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, alias := range existingAliases {
+		if slices.Contains(wantAliases, alias) {
+			continue
+		}
+
+		err := h.adminClient.Users.Aliases.Delete(user.Id, alias).Do()
+
+		if err != nil {
+			return err
+		}
+	}
+
+	// Update the user with the new state.
+	user.Aliases = wantAliases
+
+	return nil
 }
 
 func (h UserHandler) updateLicenses(user *admin.User, attributes scim.ResourceAttributes) ([]map[string]interface{}, error) {
