@@ -29,6 +29,11 @@
             "type": "license"
           }
         ],
+        "schemas": [
+          "urn:ietf:params:scim:schemas:core:2.0:User",
+          "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User",
+          "urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser"
+        ],
         "externalId": "d06de84c2ddc56242f7511ede05cd3d968d045b0c94603e7f2edffae250b0f56",
         "urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser": {
           "orgUnitPath": "/Authentik Staging"

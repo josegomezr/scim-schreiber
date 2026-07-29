@@ -23,10 +23,10 @@
     }
   ],
   "externalId" : "testuser@dev.suse.com",
-  "id" : "100994131692123746646",
+  "id" : "104965396198408263080",
   "meta" : {
     "resourceType" : "User",
-    "location" : "Users/100994131692123746646"
+    "location" : "Users/104965396198408263080"
   },
   "name" : {
     "familyName" : "User",

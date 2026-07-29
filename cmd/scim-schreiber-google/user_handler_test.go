@@ -18,8 +18,6 @@ import (
 	admin "google.golang.org/api/admin/directory/v1"
 	"google.golang.org/api/licensing/v1"
 	"google.golang.org/api/option"
-
-	"github.com/josegomezr/scim-schreiber-ldap/internal/server"
 )
 
 const (
@@ -58,7 +56,7 @@ func (suite *SCIMUserTestSuite) SetupSuite() {
 	s, err := createSCIMServer(cfg, client, license, NewProductInformationFromFile("testdata/products.yaml"))
 	require.NoError(suite.T(), err)
 
-	suite.server = server.FlattenPatchMiddleware(s)
+	suite.server = s
 }
 
 func (suite *SCIMUserTestSuite) TestCreateUser() {
@@ -100,14 +98,14 @@ func (suite *SCIMUserTestSuite) TestReplaceUser() {
 	defer gock.Off()
 	gock.Observe(gock.DumpRequest)
 	suite.mockToken(t)
-	suite.mockWithRequestBody(t, "https://admin.googleapis.com/admin/directory/v1/users/testuser@dev.suse.com", 200, "replace-user-request.json", "replace-user-response.json")
+	suite.mockWithRequestBody(t, "https://admin.googleapis.com/admin/directory/v1/users/"+testUserUUID, 200, "replace-user-request.json", "replace-user-response.json")
 	suite.mockOk(t, "https://licensing.googleapis.com/apps/licensing/v1/product/Google-Apps/sku/1010020026/user/testuser@dev.suse.com", "get_license.json")
 
-	suite.mockOk(t, "https://admin.googleapis.com/admin/directory/v1/users/100994131692123746646/aliases", "alias.json")
+	suite.mockOk(t, "https://admin.googleapis.com/admin/directory/v1/users/"+testUserUUID+"/aliases", "alias.json")
 
 	gock.New("https://licensing.googleapis.com").Delete("/apps/licensing/v1/product/Google-Apps/sku/1010020026/user/testuser@dev.suse.com").Reply(http.StatusNoContent)
 
-	request, _ := http.NewRequest(http.MethodPut, "/Users/testuser@dev.suse.com", file)
+	request, _ := http.NewRequest(http.MethodPut, "/Users/"+testUserUUID, file)
 
 	response := httptest.NewRecorder()
 	suite.server.ServeHTTP(response, request)

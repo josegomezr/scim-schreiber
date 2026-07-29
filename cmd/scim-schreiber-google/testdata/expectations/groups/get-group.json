@@ -4,7 +4,7 @@
   "id": "1",
   "email": "google-workspace-staging@dev.suse.com",
   "meta": {
-    "location": "Groups/1",
+    "location": "Groups/testGroupId",
     "resourceType": "Group"
   },
   "schemas": [

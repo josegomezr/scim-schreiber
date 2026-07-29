@@ -20,7 +20,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/josegomezr/scim-schreiber-ldap/cmd/scim-schreiber-ldap/testhelpers"
-	"github.com/josegomezr/scim-schreiber-ldap/internal/server"
 	"github.com/josegomezr/scim-schreiber-ldap/internal/uuidgenerator"
 )
 
@@ -55,7 +54,7 @@ func (suite *SCIMUserTestSuite) SetupSuite() {
 	s, err := createSCIMServer(cfg)
 	require.NoError(suite.T(), err)
 
-	suite.server = server.FlattenPatchMiddleware(s)
+	suite.server = s
 
 	ldapUtil := LdapUtil{
 		endpoint:    endpoint,
