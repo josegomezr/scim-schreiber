@@ -41,7 +41,7 @@ type UserType struct {
 }
 
 type IsSupervisor struct {
-	Value bool `json:"isSupervisor,omitempty"`
+	Value bool `json:"isSupervisor"`
 }
 
 type WorkLocationType struct {

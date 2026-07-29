@@ -46,7 +46,7 @@
     "l3leader": "L3 lead",
     "office": "CZOOH - Out of Home: Czech Republic",
     "workLocationType": "Home-Based",
-    "isSupervisor": true
+    "isSupervisor": false
   },
   "phoneNumbers": [
     {

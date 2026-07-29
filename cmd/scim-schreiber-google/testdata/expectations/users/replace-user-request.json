@@ -34,7 +34,7 @@
       "userType": "Employee"
     },
     "User1921": {
-      "isSupervisor": true
+      "isSupervisor": false
     },
     "User2471": {
       "workLocationType": "Home-Based"

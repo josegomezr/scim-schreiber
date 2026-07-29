@@ -54,7 +54,7 @@
     "l3leader": "L3 lead",
     "office": "CZOOH - Out of Home: Czech Republic",
     "workLocationType": "Home-Based",
-    "isSupervisor": true
+    "isSupervisor": false
   },
   "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User": {
     "organization": "SUSE",
