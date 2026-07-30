@@ -56,7 +56,13 @@ func main() {
 		return
 	}
 
-	scimServer, err := createSCIMServer(cfg, adminClient, licenseClient, NewProductInformationFromFile("products.yaml"))
+	products, ok := os.LookupEnv("GOOGLE_PRODUCTS")
+
+	if !ok {
+		products = "products.yaml"
+	}
+
+	scimServer, err := createSCIMServer(cfg, adminClient, licenseClient, NewProductInformationFromFile(products))
 
 	if err != nil {
 		slog.Error("Failed to create server", "err", err)
