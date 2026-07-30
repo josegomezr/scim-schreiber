@@ -33,13 +33,20 @@
       "value": "manager.email@example.org"
     }
   ],
+  "externalIds": [
+    {
+      "type": "organization",
+      "value": "123"
+    }
+  ],
   "addresses": [
     {
       "streetAddress": "Streetname 1",
       "locality": "City",
       "postalCode": "123456",
       "region": "Bavaria",
-      "countryCode": "DE"
+      "countryCode": "DE",
+      "type": "work"
     }
   ],
   "nonEditableAliases": [
@@ -81,7 +88,7 @@
       "userType": "Employee"
     },
     "User1921": {
-      "isSupervisor": true
+      "isSupervisor": false
     },
     "User2471": {
       "workLocationType": "Home-Based"

@@ -5,7 +5,8 @@
       "postalCode": "123456",
       "region": "Bavaria",
       "streetAddress": "Streetname 1",
-      "country": "DE"
+      "country": "DE",
+      "type": "work"
     }
   ],
   "active" : true,
@@ -46,7 +47,7 @@
     "l3leader": "L3 lead",
     "office": "CZOOH - Out of Home: Czech Republic",
     "workLocationType": "Home-Based",
-    "isSupervisor": true
+    "isSupervisor": false
   },
   "phoneNumbers": [
     {
@@ -62,7 +63,8 @@
     "organization": "SUSE",
     "costCenter": "1337",
     "department": "Awesome department",
-    "division": "IT Platform Engineering"
+    "division": "IT Platform Engineering",
+    "employeeNumber": "123"
   },
   "title": "Amazing Engineer",
   "schemas": [

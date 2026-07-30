@@ -164,6 +164,7 @@ func googleToAddress(entry map[string]interface{}) map[string]interface{} {
 		"locality":      entry["locality"],
 		"country":       entry["countryCode"],
 		"region":        entry["region"],
+		"type":          entry["type"],
 	}
 
 	return address
@@ -190,6 +191,17 @@ func userToUserResource(entry *admin.User) scim.Resource {
 				break
 			}
 
+		}
+	}
+
+	if entry.ExternalIds != nil {
+		externalIds := entry.ExternalIds.([]interface{})
+		for _, externalId := range externalIds {
+			id := externalId.(map[string]interface{})
+
+			if id["type"] == "organization" {
+				enterpriseExt["employeeNumber"] = id["value"].(string)
+			}
 		}
 	}
 
@@ -315,14 +327,22 @@ func (h UserHandler) resourceToUser(resourceAttrs map[string]interface{}) (*admi
 		googleAddresses = make([]admin.UserAddress, 0, len(addresses))
 		for _, addressRaw := range addresses {
 			address := addressRaw.(map[string]interface{})
-			googleAddresses = append(googleAddresses, admin.UserAddress{
+
+			userAddress := admin.UserAddress{
 				CountryCode:   utils.GetOptionalSingleAttribute(address, "country"),
 				Locality:      utils.GetOptionalSingleAttribute(address, "locality"),
 				PostalCode:    utils.GetOptionalSingleAttribute(address, "postalCode"),
 				Region:        utils.GetOptionalSingleAttribute(address, "region"),
 				StreetAddress: utils.GetOptionalSingleAttribute(address, "streetAddress"),
 				Type:          utils.GetOptionalSingleAttribute(address, "type"),
-			})
+			}
+
+			userAddress.Formatted = strings.Join([]string{
+				userAddress.StreetAddress, userAddress.Locality,
+				userAddress.PostalCode, userAddress.Region, userAddress.CountryCode,
+			}, ", ")
+
+			googleAddresses = append(googleAddresses, userAddress)
 		}
 	}
 
@@ -456,6 +476,17 @@ func (h UserHandler) resourceToUser(resourceAttrs map[string]interface{}) (*admi
 		},
 	}
 
+	var externalIds []admin.UserExternalId
+
+	if val, ok := utils.GetExtensionAttribute(resourceAttrs, model.SCHEMA_ENTERPRISE_USER, "employeeNumber"); ok {
+		externalIds = []admin.UserExternalId{
+			{
+				Type:  "organization",
+				Value: casting.SingleValue[string](val),
+			},
+		}
+	}
+
 	bytes, err := custom.MarshalGoogleApi()
 
 	if err != nil {
@@ -478,6 +509,7 @@ func (h UserHandler) resourceToUser(resourceAttrs map[string]interface{}) (*admi
 		Relations:     relations,
 		Organizations: organizations,
 		Phones:        googlePhones,
+		ExternalIds:   externalIds,
 		//Emails:        googleEmails,
 	}, nil
 }

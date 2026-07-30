@@ -29,11 +29,6 @@
       "type": "work"
     }
   ],
-  "custom": {
-    "Region" : {
-      "addressesWorkCountryCode" : "DE"
-    }
-  },
   "phoneNumbers": [
     {
       "type": "mobile",
@@ -61,13 +56,14 @@
     "l3leader": "L3 lead",
     "office": "CZOOH - Out of Home: Czech Republic",
     "workLocationType": "Home-Based",
-    "isSupervisor": true
+    "isSupervisor": false
   },
   "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User": {
     "organization": "SUSE",
     "costCenter": "1337",
     "department": "Awesome department",
-    "division": "IT Platform Engineering"
+    "division": "IT Platform Engineering",
+    "employeeNumber": "123"
   },
   "title": "Amazing Engineer",
   "userType": "Employee"
