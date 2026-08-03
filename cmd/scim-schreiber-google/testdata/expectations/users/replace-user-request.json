@@ -10,6 +10,7 @@
       "type": "work"
     }
   ],
+  "archived": false,
   "customSchemas": {
     "Job_Family": {
       "jobfamily5241": "IT Management"
@@ -82,5 +83,6 @@
       "type": "manager",
       "value": "manager.email@example.org"
     }
-  ]
+  ],
+  "suspended": false
 }

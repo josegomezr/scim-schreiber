@@ -510,7 +510,12 @@ func (h UserHandler) resourceToUser(resourceAttrs map[string]interface{}) (*admi
 		Organizations: organizations,
 		Phones:        googlePhones,
 		ExternalIds:   externalIds,
+		Archived:      !casting.SingleValue[bool](resourceAttrs["active"]),
 		//Emails:        googleEmails,
+
+		ForceSendFields: []string{
+			"Archived", "Suspended",
+		},
 	}, nil
 }
 
