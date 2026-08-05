@@ -69,7 +69,7 @@ func main() {
 		return
 	}
 
-	server.StartHttpServer(scimServer)
+	server.StartHttpServer(scimServer, server.ResponseHeaderMiddleware)
 }
 
 func createTokenSource(ctx context.Context, cfg *Config) (option.ClientOption, error) {

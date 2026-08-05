@@ -12,6 +12,7 @@ import (
 	"github.com/elimity-com/scim"
 	scimerrors "github.com/elimity-com/scim/errors"
 	"github.com/elimity-com/scim/optional"
+	"github.com/josegomezr/scim-schreiber-ldap/internal/server"
 	"github.com/scim2/filter-parser/v2"
 	admin "google.golang.org/api/admin/directory/v1"
 	"google.golang.org/api/googleapi"
@@ -183,9 +184,9 @@ func userToUserResource(entry *admin.User) scim.Resource {
 
 			if org["customType"] == "work" {
 				enterpriseExt = map[string]interface{}{
-					"organization": org["name"].(string),
-					"costCenter":   org["costCenter"].(string),
-					"department":   org["department"].(string),
+					"organization": casting.SingleValue[string](org["name"]),
+					"costCenter":   casting.SingleValue[string](org["costCenter"]),
+					"department":   casting.SingleValue[string](org["department"]),
 				}
 				title = org["title"].(string)
 				break
@@ -519,7 +520,7 @@ func (h UserHandler) resourceToUser(resourceAttrs map[string]interface{}) (*admi
 	}, nil
 }
 
-func (h UserHandler) GetAll(_ *http.Request, params scim.ListRequestParams) (scim.Page, error) {
+func (h UserHandler) GetAll(httpRequest *http.Request, params scim.ListRequestParams) (scim.Page, error) {
 	slog.Info("GET /v2/Users", "params", params)
 	principal, err := model.PrincipalFromFilter(params.FilterValidator)
 	if err != nil {
@@ -535,6 +536,12 @@ func (h UserHandler) GetAll(_ *http.Request, params scim.ListRequestParams) (sci
 		request = request.Query("email=" + principal)
 	}
 
+	pageToken := httpRequest.URL.Query().Get("pageToken")
+
+	if pageToken != "" {
+		request = request.PageToken(pageToken)
+	}
+
 	// Pagination is not implemented here. But we also don't really need it.
 	users, err := request.Do()
 
@@ -544,6 +551,10 @@ func (h UserHandler) GetAll(_ *http.Request, params scim.ListRequestParams) (sci
 
 	for _, user := range users.Users {
 		resources = append(resources, userToUserResource(user))
+	}
+
+	if users.NextPageToken != "" {
+		server.SetResponseHeader(httpRequest.Context(), "pageToken", users.NextPageToken)
 	}
 
 	return scim.Page{
