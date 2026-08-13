@@ -1,0 +1,54 @@
+{
+  "addresses": [
+    {
+      "countryCode": "DE",
+      "formatted": "Streetname 1, City, 123456, Bavaria, DE",
+      "locality": "City",
+      "postalCode": "123456",
+      "region": "Bavaria",
+      "streetAddress": "Streetname 1",
+      "type": "work"
+    }
+  ],
+  "archived": false,
+  "externalIds": [
+    {
+      "type": "organization",
+      "value": "123"
+    }
+  ],
+  "name": {
+    "displayName": "Display Test",
+    "familyName": "User",
+    "fullName": "Test User",
+    "givenName": "Replace"
+  },
+  "orgUnitPath": "/Authentik Staging",
+  "organizations": [
+    {
+      "costCenter": "1337",
+      "customType": "work",
+      "department": "Awesome department",
+      "name": "SUSE",
+      "title": "Amazing Engineer"
+    }
+  ],
+  "phones": [
+    {
+      "type": "work_mobile",
+      "value": "+1 234"
+    },
+    {
+      "type": "work",
+      "value": "+1 456"
+    }
+  ],
+  "primaryEmail": "testuser@dev.suse.com",
+  "relations": [
+    {
+      "type": "manager",
+      "value": "manager.email@example.org"
+    }
+  ],
+  "suspended": false
+}

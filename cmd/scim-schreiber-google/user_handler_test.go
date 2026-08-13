@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/h2non/gock"
@@ -83,9 +84,6 @@ func (suite *SCIMUserTestSuite) TestCreateUser() {
 	assert.Equal(t, http.StatusCreated, response.Code)
 }
 
-//go:embed testdata/expectations/users/replace-user.json
-var replaceUserExpectation string
-
 func (suite *SCIMUserTestSuite) TestReplaceUser() {
 	t := suite.T()
 
@@ -98,7 +96,7 @@ func (suite *SCIMUserTestSuite) TestReplaceUser() {
 	defer gock.Off()
 	gock.Observe(gock.DumpRequest)
 	suite.mockToken(t)
-	suite.mockWithRequestBody(t, "https://admin.googleapis.com/admin/directory/v1/users/"+testUserUUID, 200, "replace-user-request.json", "replace-user-response.json")
+	suite.mockWithRequestBody(t, "https://admin.googleapis.com/admin/directory/v1/users/"+testUserUUID, 200, replaceUserRequestExpectation, "replace-user-response.json")
 	suite.mockOk(t, "https://licensing.googleapis.com/apps/licensing/v1/product/Google-Apps/sku/1010020026/user/testuser@dev.suse.com", "get_license.json")
 
 	suite.mockOk(t, "https://admin.googleapis.com/admin/directory/v1/users/"+testUserUUID+"/aliases", "alias.json")
@@ -116,9 +114,6 @@ func (suite *SCIMUserTestSuite) TestReplaceUser() {
 
 	assert.JSONEq(t, want, got)
 }
-
-//go:embed testdata/expectations/users/patch-user.json
-var patchUserExpectation string
 
 func (suite *SCIMUserTestSuite) TestPatchUser() {
 	t := suite.T()
@@ -187,9 +182,6 @@ func (suite *SCIMUserTestSuite) TestMissing() {
 	assert.Equal(t, http.StatusInternalServerError, response.Code)
 }
 
-//go:embed testdata/expectations/users/get-user.json
-var getUserExpectation string
-
 func (suite *SCIMUserTestSuite) TestGetUser() {
 	t := suite.T()
 
@@ -222,28 +214,19 @@ func (suite *SCIMUserTestSuite) mock(t *testing.T, url string, status int, respo
 	gock.New(url).Reply(status).Body(file)
 }
 
-func (suite *SCIMUserTestSuite) mockWithRequestBody(t *testing.T, url string, status int, requestFile string, responseFile string) {
+func (suite *SCIMUserTestSuite) mockWithRequestBody(t *testing.T, url string, status int, requestBody string, responseFile string) {
 	stub, err := os.Open(filepath.Join(".", "testdata", "stubs", "users", responseFile))
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		require.NoError(t, stub.Close())
 	})
 
-	requestExpectation, err := os.Open(filepath.Join(".", "testdata", "expectations", "users", requestFile))
-	require.NoError(t, err)
-	t.Cleanup(func() {
-		require.NoError(t, requestExpectation.Close())
-	})
-
-	gock.New(url).Body(requestExpectation).Reply(status).Body(stub)
+	gock.New(url).Body(strings.NewReader(requestBody)).Reply(status).Body(stub)
 }
 
 func (suite *SCIMUserTestSuite) mockToken(t *testing.T) {
 	suite.mockOk(t, "https://oauth2.googleapis.com/token", "token.json")
 }
-
-//go:embed testdata/expectations/users/all-users.json
-var allUsersExpectation string
 
 func (suite *SCIMUserTestSuite) TestGetAllUsers() {
 	t := suite.T()
@@ -262,9 +245,6 @@ func (suite *SCIMUserTestSuite) TestGetAllUsers() {
 	assert.JSONEq(t, want, got)
 	assert.Equal(t, http.StatusOK, response.Code)
 }
-
-//go:embed testdata/expectations/users/filter-users.json
-var filterUserExpectation string
 
 func (suite *SCIMUserTestSuite) TestFilterUsers() {
 	t := suite.T()
