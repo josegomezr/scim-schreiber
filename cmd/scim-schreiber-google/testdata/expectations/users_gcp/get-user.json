@@ -1,0 +1,79 @@
+{
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User",
+    "urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser",
+    "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"
+  ],
+  "externalId": "first.last@example.com",
+  "id": "104965396198408263080",
+  "active": true,
+  "userName": "first.last@example.com",
+  "displayName": "",
+  "name": {
+    "familyName": "LastName",
+    "formatted": "FirstName LastName",
+    "givenName": "FirstName"
+  },
+  "addresses": [
+    {
+      "country": "BG",
+      "locality":  "Bulgaria OOH",
+      "postalCode": "00000",
+      "region": "Sofia",
+      "streetAddress": "NA",
+      "type": "work"
+    },
+    {
+      "country": null,
+      "locality":  null,
+      "postalCode": null,
+      "region": null,
+      "streetAddress": null,
+      "type": "home"
+    }
+  ],
+  "phoneNumbers": [],
+  "emails": [
+    {
+      "type": "work",
+      "primary": true,
+      "value": "first.last@example.com"
+    },
+    {
+      "type": "work",
+      "primary": false,
+      "value": "svc_test@example.com"
+    },
+    {
+      "type": "work",
+      "primary": false,
+      "value": "1000@example.com"
+    }
+  ],
+  "urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser": {
+    "orgUnitPath": "/",
+    "relations": [
+      {
+        "type": "manager",
+        "value":  "manager.name@example.com"
+      }
+    ]
+  },
+  "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User": {
+    "organization": "SUSE",
+    "costCenter": "000",
+    "department": "Finance, IT, Procurement & IR"
+  },
+  "title": "Team Lead",
+  "userType": "",
+  "entitlements": [
+    {
+      "type": "license",
+      "value": "Google Workspace Enterprise Standard"
+    }
+  ],
+  "meta": {
+    "location": "Users/104965396198408263080",
+    "resourceType": "User"
+  }
+}

@@ -27,6 +27,9 @@ jobs:
       - name: Test
         run: go test -cover -coverprofile=coverage.txt  -v ./...
 
+      - name: Test with Google extensions
+        run: go test -v ./cmd/scim-schreiber-google/... -tags google_custom
+
       - name: Archive code coverage results
         uses: actions/upload-artifact@v4
         with:

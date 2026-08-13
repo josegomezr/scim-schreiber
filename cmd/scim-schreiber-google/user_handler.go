@@ -239,29 +239,14 @@ func userToUserResource(entry *admin.User) scim.Resource {
 		}
 	}
 
-	customFields := CustomFields{}
-
-	if entry.CustomSchemas != nil {
-		c, err := UnmarshalGoogleApi(entry.CustomSchemas)
-
-		if err != nil {
-			slog.Error("Could not unmarshal custom fields", "error", err)
-		} else {
-			customFields = c
-		}
-	}
+	customFields := UnmarshallCustomSchemas(entry.CustomSchemas)
 
 	googleExt := map[string]interface{}{
-		"orgUnitPath":      entry.OrgUnitPath,
-		"relations":        entry.Relations,
-		"isSupervisor":     customFields.IsSupervisor.Value,
-		"jobFamily":        customFields.JobFamily.Value,
-		"l3leader":         customFields.L3Leader.Value,
-		"workLocationType": customFields.WorkLocationType.Value,
-		"office":           customFields.Office.Value,
+		"orgUnitPath": entry.OrgUnitPath,
+		"relations":   entry.Relations,
 	}
 
-	enterpriseExt["division"] = customFields.Division.Value
+	UpdateSCIMExtensions(customFields, googleExt, enterpriseExt)
 
 	return scim.Resource{
 		ID:         entry.Id,
@@ -279,15 +264,11 @@ func userToUserResource(entry *admin.User) scim.Resource {
 			"addresses":    addresses,
 			"title":        title,
 			"phoneNumbers": phones,
-			"userType":     customFields.UserType.Value,
+			"userType":     customFields.GetUserType(),
 			"urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser": googleExt,
 			"urn:ietf:params:scim:schemas:extension:enterprise:2.0:User": enterpriseExt,
 		},
 	}
-}
-
-type RawRequest struct {
-	Custom map[string]googleapi.RawMessage `json:"custom"`
 }
 
 func (h UserHandler) resourceToUser(resourceAttrs map[string]interface{}) (*admin.User, error) {
@@ -401,82 +382,6 @@ func (h UserHandler) resourceToUser(resourceAttrs map[string]interface{}) (*admi
 		})
 	}
 
-	division := ""
-	if val, ok := utils.GetExtensionAttribute(resourceAttrs, model.SCHEMA_ENTERPRISE_USER, "division"); ok {
-		division = casting.SingleValue[string](val)
-	}
-
-	country := ""
-	// Just take the first address to determine this.
-	if len(googleAddresses) > 0 {
-		country = googleAddresses[0].CountryCode
-	}
-
-	isSupervisor := false
-	if val, ok := utils.GetExtensionAttribute(resourceAttrs, SCHEMA_GOOGLE_USER, "isSupervisor"); ok {
-		isSupervisor = val.(bool)
-	}
-
-	jobFamily := ""
-	if val, ok := utils.GetExtensionAttribute(resourceAttrs, SCHEMA_GOOGLE_USER, "jobFamily"); ok {
-		jobFamily = casting.SingleValue[string](val)
-	}
-
-	l3leader := ""
-	if val, ok := utils.GetExtensionAttribute(resourceAttrs, SCHEMA_GOOGLE_USER, "l3leader"); ok {
-		l3leader = casting.SingleValue[string](val)
-	}
-
-	workLocationType := ""
-	if val, ok := utils.GetExtensionAttribute(resourceAttrs, SCHEMA_GOOGLE_USER, "workLocationType"); ok {
-		workLocationType = casting.SingleValue[string](val)
-	}
-
-	office := ""
-	if val, ok := utils.GetExtensionAttribute(resourceAttrs, SCHEMA_GOOGLE_USER, "office"); ok {
-		office = casting.SingleValue[string](val)
-	}
-
-	aliases := h.getAliases(resourceAttrs)
-	proxyAddr := make([]ProxyAddress, 0, len(aliases))
-
-	for _, alias := range aliases {
-		proxyAddr = append(proxyAddr, ProxyAddress{
-			Type:  "work",
-			Value: alias,
-		})
-	}
-
-	custom := CustomFields{
-		JobFamily: JobFamily{
-			Value: jobFamily,
-		},
-		L3Leader: L3Leader{
-			Value: l3leader,
-		},
-		ProxyAddresses: ProxyAddresses{
-			ProxyAddresses: proxyAddr,
-		},
-		Region: Region{
-			CountryCode: country,
-		},
-		Office: Office{
-			Value: office,
-		},
-		UserType: UserType{
-			Value: utils.GetOptionalSingleAttribute(resourceAttrs, "userType"),
-		},
-		IsSupervisor: IsSupervisor{
-			Value: isSupervisor,
-		},
-		WorkLocationType: WorkLocationType{
-			Value: workLocationType,
-		},
-		Division: Division{
-			Value: division,
-		},
-	}
-
 	var externalIds []admin.UserExternalId
 
 	if val, ok := utils.GetExtensionAttribute(resourceAttrs, model.SCHEMA_ENTERPRISE_USER, "employeeNumber"); ok {
@@ -488,7 +393,7 @@ func (h UserHandler) resourceToUser(resourceAttrs map[string]interface{}) (*admi
 		}
 	}
 
-	bytes, err := custom.MarshalGoogleApi()
+	bytes, err := CustomResourceToUser(resourceAttrs, googleAddresses, h.getAliases(resourceAttrs))
 
 	if err != nil {
 		return nil, err

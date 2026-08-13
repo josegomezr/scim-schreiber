@@ -1,3 +1,5 @@
+//go:build google_custom
+
 package main
 
 import (
@@ -7,6 +9,9 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/josegomezr/scim-schreiber-ldap/internal/casting"
+	"github.com/josegomezr/scim-schreiber-ldap/internal/model"
+	"github.com/josegomezr/scim-schreiber-ldap/internal/utils"
 	admin "google.golang.org/api/admin/directory/v1"
 	"google.golang.org/api/googleapi"
 )
@@ -64,6 +69,10 @@ type CustomFields struct {
 	Division         Division         `json:"User7951,omitempty"`
 }
 
+func (c *CustomFields) GetUserType() string {
+	return c.UserType.Value
+}
+
 func UnmarshalGoogleApi(data map[string]googleapi.RawMessage) (CustomFields, error) {
 	c := CustomFields{}
 
@@ -90,8 +99,8 @@ func UnmarshalGoogleApi(data map[string]googleapi.RawMessage) (CustomFields, err
 	return c, nil
 }
 
-func (c CustomFields) MarshalGoogleApi() (map[string]googleapi.RawMessage, error) {
-	value := reflect.ValueOf(&c).Elem()
+func (c *CustomFields) MarshalGoogleApi() (map[string]googleapi.RawMessage, error) {
+	value := reflect.ValueOf(c).Elem()
 	typeOfT := value.Type()
 
 	ret := make(map[string]googleapi.RawMessage, value.NumField())
@@ -286,6 +295,22 @@ func CustomSchemaSpec() []CustomSchema {
 	}
 }
 
+func UnmarshallCustomSchemas(customSchemas map[string]googleapi.RawMessage) CustomFields {
+	customFields := CustomFields{}
+
+	if customSchemas != nil {
+		c, err := UnmarshalGoogleApi(customSchemas)
+
+		if err != nil {
+			slog.Error("Could not unmarshal custom fields", "error", err)
+		} else {
+			customFields = c
+		}
+	}
+
+	return customFields
+}
+
 func SyncSchemas(adminClient *admin.Service) error {
 	schemas, err := adminClient.Schemas.List("my_customer").Do()
 
@@ -334,4 +359,93 @@ func SyncSchemas(adminClient *admin.Service) error {
 		}
 	}
 	return nil
+}
+
+func CustomResourceToUser(resourceAttrs map[string]interface{}, googleAddresses []admin.UserAddress, aliases []string) (map[string]googleapi.RawMessage, error) {
+	division := ""
+	if val, ok := utils.GetExtensionAttribute(resourceAttrs, model.SCHEMA_ENTERPRISE_USER, "division"); ok {
+		division = casting.SingleValue[string](val)
+	}
+
+	country := ""
+	// Just take the first address to determine this.
+	if len(googleAddresses) > 0 {
+		country = googleAddresses[0].CountryCode
+	}
+
+	isSupervisor := false
+	if val, ok := utils.GetExtensionAttribute(resourceAttrs, SCHEMA_GOOGLE_USER, "isSupervisor"); ok {
+		isSupervisor = val.(bool)
+	}
+
+	jobFamily := ""
+	if val, ok := utils.GetExtensionAttribute(resourceAttrs, SCHEMA_GOOGLE_USER, "jobFamily"); ok {
+		jobFamily = casting.SingleValue[string](val)
+	}
+
+	l3leader := ""
+	if val, ok := utils.GetExtensionAttribute(resourceAttrs, SCHEMA_GOOGLE_USER, "l3leader"); ok {
+		l3leader = casting.SingleValue[string](val)
+	}
+
+	workLocationType := ""
+	if val, ok := utils.GetExtensionAttribute(resourceAttrs, SCHEMA_GOOGLE_USER, "workLocationType"); ok {
+		workLocationType = casting.SingleValue[string](val)
+	}
+
+	office := ""
+	if val, ok := utils.GetExtensionAttribute(resourceAttrs, SCHEMA_GOOGLE_USER, "office"); ok {
+		office = casting.SingleValue[string](val)
+	}
+
+	proxyAddr := make([]ProxyAddress, 0, len(aliases))
+
+	for _, alias := range aliases {
+		proxyAddr = append(proxyAddr, ProxyAddress{
+			Type:  "work",
+			Value: alias,
+		})
+	}
+
+	custom := CustomFields{
+		JobFamily: JobFamily{
+			Value: jobFamily,
+		},
+		L3Leader: L3Leader{
+			Value: l3leader,
+		},
+		ProxyAddresses: ProxyAddresses{
+			ProxyAddresses: proxyAddr,
+		},
+		Region: Region{
+			CountryCode: country,
+		},
+		Office: Office{
+			Value: office,
+		},
+		UserType: UserType{
+			Value: utils.GetOptionalSingleAttribute(resourceAttrs, "userType"),
+		},
+		IsSupervisor: IsSupervisor{
+			Value: isSupervisor,
+		},
+		WorkLocationType: WorkLocationType{
+			Value: workLocationType,
+		},
+		Division: Division{
+			Value: division,
+		},
+	}
+
+	return custom.MarshalGoogleApi()
+}
+
+func UpdateSCIMExtensions(customFields CustomFields, googleExt map[string]interface{}, enterpriseExt map[string]interface{}) {
+	googleExt["isSupervisor"] = customFields.IsSupervisor.Value
+	googleExt["jobFamily"] = customFields.JobFamily.Value
+	googleExt["l3leader"] = customFields.L3Leader.Value
+	googleExt["workLocationType"] = customFields.WorkLocationType.Value
+	googleExt["office"] = customFields.Office.Value
+
+	enterpriseExt["division"] = customFields.Division.Value
 }
