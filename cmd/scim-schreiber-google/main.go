@@ -84,7 +84,10 @@ func createTokenSource(ctx context.Context, cfg *Config) (option.ClientOption, e
 		admin.AdminDirectoryGroupScope,
 		admin.AdminDirectoryOrgunitScope,
 		licensing.AppsLicensingScope,
-		admin.AdminDirectoryUserschemaScope,
+	}
+
+	for _, scope := range AdditionalScopes() {
+		scopes = append(scopes, scope)
 	}
 
 	config, err := google.JWTConfigFromJSON(b, scopes...)

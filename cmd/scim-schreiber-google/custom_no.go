@@ -30,3 +30,7 @@ func (c *CustomFields) GetUserType() string {
 func UpdateSCIMExtensions(customFields CustomFields, googleExt map[string]interface{}, enterpriseExt map[string]interface{}) {
 	// noop
 }
+
+func AdditionalScopes() []string {
+	return []string{}
+}
