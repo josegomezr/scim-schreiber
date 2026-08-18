@@ -449,3 +449,9 @@ func UpdateSCIMExtensions(customFields CustomFields, googleExt map[string]interf
 
 	enterpriseExt["division"] = customFields.Division.Value
 }
+
+func AdditionalScopes() []string {
+	return []string{
+		admin.AdminDirectoryUserschemaScope,
+	}
+}
