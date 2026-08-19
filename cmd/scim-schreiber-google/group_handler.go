@@ -10,6 +10,7 @@ import (
 	scimerrors "github.com/elimity-com/scim/errors"
 	"github.com/elimity-com/scim/filter"
 	"github.com/elimity-com/scim/optional"
+	"github.com/josegomezr/scim-schreiber-ldap/internal/utils"
 	scim_filter_parser "github.com/scim2/filter-parser/v2"
 	admin "google.golang.org/api/admin/directory/v1"
 	"google.golang.org/api/googleapi"
@@ -87,19 +88,26 @@ func displayNameFromFilter(filterValidator *filter.Validator) (string, error) {
 }
 
 func groupToGroupResource(entry *admin.Group) scim.Resource {
+	googleExt := map[string]interface{}{
+		"email": entry.Email,
+	}
+
 	return scim.Resource{
 		ID:         entry.Id,
 		ExternalID: optional.NewString(entry.Id),
 		Attributes: map[string]interface{}{
-			"displayName": entry.Name,
-			"email":       entry.Email,
+			"displayName":       entry.Name,
+			SCHEMA_GOOGLE_GROUP: googleExt,
 		},
 	}
 }
 
 func resourceToGroup(resourceAttrs map[string]interface{}) *admin.Group {
 	displayName := casting.SingleValue[string](resourceAttrs["displayName"])
-	email := casting.SingleValue[string](resourceAttrs["email"])
+	email := ""
+	if val, ok := utils.GetExtensionAttribute(resourceAttrs, SCHEMA_GOOGLE_GROUP, "email"); ok {
+		email = casting.SingleValue[string](val)
+	}
 
 	return &admin.Group{
 		Name:  displayName,

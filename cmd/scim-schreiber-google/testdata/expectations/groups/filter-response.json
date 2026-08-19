@@ -4,10 +4,12 @@
       "displayName": "Test Group",
       "externalId": "04iylrwe1ryosyl",
       "id": "04iylrwe1ryosyl",
-      "email":"abuse@dev.suse.com",
       "meta": {
         "resourceType": "Group",
         "location": "Groups/04iylrwe1ryosyl"
+      },
+      "urn:ietf:params:scim:schemas:extension:google:2.0:CloudIdentityGroup": {
+        "email": "abuse@dev.suse.com"
       },
       "schemas": [
         "urn:ietf:params:scim:schemas:core:2.0:Group",
