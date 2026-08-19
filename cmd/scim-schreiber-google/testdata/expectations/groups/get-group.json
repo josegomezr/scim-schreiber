@@ -2,10 +2,12 @@
   "displayName": "Replaced Group",
   "externalId": "1",
   "id": "1",
-  "email": "google-workspace-staging@dev.suse.com",
   "meta": {
     "location": "Groups/testGroupId",
     "resourceType": "Group"
+  },
+  "urn:ietf:params:scim:schemas:extension:google:2.0:CloudIdentityGroup": {
+    "email": "google-workspace-staging@dev.suse.com"
   },
   "schemas": [
     "urn:ietf:params:scim:schemas:core:2.0:Group",

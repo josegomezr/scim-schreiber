@@ -5,8 +5,10 @@ import (
 	"github.com/elimity-com/scim/schema"
 )
 
+const SCHEMA_GOOGLE_GROUP = "urn:ietf:params:scim:schemas:extension:google:2.0:CloudIdentityGroup"
+
 var SchemaExtensionGoogleCloudIdentityGroup = schema.Schema{
-	ID:          "urn:ietf:params:scim:schemas:extension:google:2.0:CloudIdentityGroup",
+	ID:          SCHEMA_GOOGLE_GROUP,
 	Name:        optional.NewString("CloudIdentityGroup"),
 	Description: optional.NewString("Google Cloud Identity Group attributes"),
 	Attributes: []schema.CoreAttribute{
@@ -28,7 +30,7 @@ const SCHEMA_GOOGLE_USER = "urn:ietf:params:scim:schemas:extension:suse:2.0:Goog
 
 // this is a custom extension, as Google does not publish one containing all their user attributes
 var SchemaExtensionSUSEGoogleUser = schema.Schema{
-	ID:          "urn:ietf:params:scim:schemas:extension:suse:2.0:GoogleUser",
+	ID:          SCHEMA_GOOGLE_USER,
 	Name:        optional.NewString("SUSE Google User Extension"),
 	Description: optional.NewString("Custom Google Workspace User attributes"),
 	Attributes: []schema.CoreAttribute{

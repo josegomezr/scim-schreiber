@@ -4,10 +4,12 @@
       "displayName": "abuse",
       "externalId": "04iylrwe1ryosyl",
       "id": "04iylrwe1ryosyl",
-      "email":"abuse@dev.suse.com",
       "meta": {
         "location": "Groups/04iylrwe1ryosyl",
         "resourceType": "Group"
+      },
+      "urn:ietf:params:scim:schemas:extension:google:2.0:CloudIdentityGroup": {
+        "email": "abuse@dev.suse.com"
       },
       "schemas": [
         "urn:ietf:params:scim:schemas:core:2.0:Group",
@@ -18,10 +20,12 @@
       "displayName": "postmaster",
       "externalId": "00tyjcwt2wgxqro",
       "id": "00tyjcwt2wgxqro",
-      "email":"postmaster@dev.suse.com",
       "meta": {
         "location": "Groups/00tyjcwt2wgxqro",
         "resourceType": "Group"
+      },
+      "urn:ietf:params:scim:schemas:extension:google:2.0:CloudIdentityGroup": {
+        "email": "postmaster@dev.suse.com"
       },
       "schemas": [
         "urn:ietf:params:scim:schemas:core:2.0:Group",
