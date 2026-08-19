@@ -477,6 +477,31 @@ func (suite *SCIMUserTestSuite) TestFilterUsers() {
 	assert.Equal(t, http.StatusOK, response.Code)
 }
 
+func (suite *SCIMUserTestSuite) TestFilterUsersWildcard() {
+	t := suite.T()
+
+	request, _ := http.NewRequest(http.MethodGet, "/Users?filter="+url.QueryEscape("userName eq \"*\""), nil)
+	ctx := WithLDAPContext(request.Context(), suite.ldapCtx)
+	request = request.WithContext(ctx)
+
+	response := httptest.NewRecorder()
+	suite.server.ServeHTTP(response, request)
+
+	got := response.Body.String()
+	want := `
+    {
+	  "Resources" : [],
+	  "itemsPerPage" : 100,
+	  "schemas" : [ "urn:ietf:params:scim:api:messages:2.0:ListResponse" ],
+	  "startIndex" : 1,
+	  "totalResults" : 1
+	}
+    `
+
+	assert.JSONEq(t, want, got)
+	assert.Equal(t, http.StatusOK, response.Code)
+}
+
 func TestSCIMUserTestSuite(t *testing.T) {
 	suite.Run(t, new(SCIMUserTestSuite))
 }
