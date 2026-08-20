@@ -268,13 +268,13 @@ func (l *LdapUtil) UpdateEntry(dn string, adds map[string][]string, removes map[
 }
 
 func (l *LdapUtil) searchGroups(uid string, field string) (iter.Seq2[*ldap.Entry, error], error) {
-	filter := fmt.Sprintf("(%s=%s)", field, ldap.EscapeDN(uid))
+	filter := fmt.Sprintf("(%s=%s)", field, ldap.EscapeFilter(uid))
 	baseUid := l.baseGroupOu + "," + l.baseDn
 	return l.SearchIter(filter, baseUid), nil
 }
 
 func (l *LdapUtil) searchUsers(uid string, field string) (iter.Seq2[*ldap.Entry, error], error) {
-	filter := fmt.Sprintf("(%s=%s)", field, ldap.EscapeDN(uid))
+	filter := fmt.Sprintf("(%s=%s)", field, ldap.EscapeFilter(uid))
 
 	baseUid := l.baseUserOu + "," + l.baseDn
 	return l.SearchIter(filter, baseUid), nil
