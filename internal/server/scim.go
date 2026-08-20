@@ -53,8 +53,10 @@ func NewSCIMServer(userHandler scim.ResourceHandler, groupHandler scim.ResourceH
 	groupExtensions = append(groupExtensions, []scim.SchemaExtension{}...)
 
 	userSchema := schema.CoreUserSchema()
-	userSchema.Attributes = append(userSchema.Attributes, schema.SchemasAttributes())
 	userSchema.Attributes = append(userSchema.Attributes, schema.CommonAttributes()...)
+
+	groupSchema := schema.CoreGroupSchema()
+	groupSchema.Attributes = append(groupSchema.Attributes, schema.CommonAttributes()...)
 
 	resourceTypes := []scim.ResourceType{
 		{
@@ -71,7 +73,7 @@ func NewSCIMServer(userHandler scim.ResourceHandler, groupHandler scim.ResourceH
 			Name:             "Group",
 			Endpoint:         "/Groups",
 			Description:      optional.NewString("Groups"),
-			Schema:           schema.CoreGroupSchema(),
+			Schema:           groupSchema,
 			SchemaExtensions: groupExtensions,
 			Handler:          groupHandler,
 		},
