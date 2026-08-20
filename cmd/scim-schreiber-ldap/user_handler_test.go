@@ -480,7 +480,7 @@ func (suite *SCIMUserTestSuite) TestFilterUsers() {
 func (suite *SCIMUserTestSuite) TestFilterUsersWildcard() {
 	t := suite.T()
 
-	request, _ := http.NewRequest(http.MethodGet, "/Users?filter="+url.QueryEscape("userName eq \"*\""), nil)
+	request, _ := http.NewRequest(http.MethodGet, "/Users?filter="+url.QueryEscape("userName eq \"user*with_star\""), nil)
 	ctx := WithLDAPContext(request.Context(), suite.ldapCtx)
 	request = request.WithContext(ctx)
 

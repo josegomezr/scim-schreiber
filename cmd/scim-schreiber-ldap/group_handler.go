@@ -37,7 +37,7 @@ func (h GroupHandler) Create(r *http.Request, attributes scim.ResourceAttributes
 		}
 	}
 
-	entries, err := ldapCtx.searchGroups(attributes["displayName"].(string), "cn")
+	entries, err := ldapCtx.searchGroups(ldap.EscapeFilter(attributes["displayName"].(string)), "cn")
 
 	if err != nil {
 		return scim.Resource{}, errors.ScimErrorInternal
@@ -102,7 +102,7 @@ func (h GroupHandler) Get(r *http.Request, id string) (scim.Resource, error) {
 		}
 	}
 
-	entries, err := ldapCtx.searchGroups(id, "cn")
+	entries, err := ldapCtx.searchGroups(ldap.EscapeFilter(id), "cn")
 
 	if err != nil {
 		slog.Error("An error occurred while getting group", "id", id, "err", err)
@@ -135,7 +135,7 @@ func displayNameFromFilter(filterValidator *filter.Validator) (string, error) {
 	if f.AttributePath.AttributeName != "displayName" {
 		return "", fmt.Errorf("only 'displayName' is supported in filters")
 	}
-	return f.CompareValue.(string), nil
+	return ldap.EscapeFilter(f.CompareValue.(string)), nil
 }
 
 func (h GroupHandler) GetAll(r *http.Request, params scim.ListRequestParams) (scim.Page, error) {

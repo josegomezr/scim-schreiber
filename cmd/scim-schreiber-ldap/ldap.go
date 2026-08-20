@@ -162,7 +162,7 @@ func (l *LdapUtil) disconnect() error {
 
 func (l *LdapUtil) GetGroup(id string) (*ldap.Entry, error) {
 
-	filter := fmt.Sprintf("(cn=%s)", id)
+	filter := fmt.Sprintf("(cn=%s)", ldap.EscapeFilter(id))
 	baseUid := l.baseGroupOu + "," + l.baseDn
 
 	searchRequest := ldap.NewSearchRequest(
@@ -268,13 +268,13 @@ func (l *LdapUtil) UpdateEntry(dn string, adds map[string][]string, removes map[
 }
 
 func (l *LdapUtil) searchGroups(uid string, field string) (iter.Seq2[*ldap.Entry, error], error) {
-	filter := fmt.Sprintf("(%s=%s)", field, ldap.EscapeFilter(uid))
+	filter := fmt.Sprintf("(%s=%s)", field, uid)
 	baseUid := l.baseGroupOu + "," + l.baseDn
 	return l.SearchIter(filter, baseUid), nil
 }
 
 func (l *LdapUtil) searchUsers(uid string, field string) (iter.Seq2[*ldap.Entry, error], error) {
-	filter := fmt.Sprintf("(%s=%s)", field, ldap.EscapeFilter(uid))
+	filter := fmt.Sprintf("(%s=%s)", field, uid)
 
 	baseUid := l.baseUserOu + "," + l.baseDn
 	return l.SearchIter(filter, baseUid), nil
@@ -327,7 +327,7 @@ func (l *LdapUtil) _searchUser(uid string, field string) *ldap.Entry {
 }
 
 func (l *LdapUtil) searchUserByUsername(uid string) *ldap.Entry {
-	return l._searchUser(uid, "uid")
+	return l._searchUser(ldap.EscapeFilter(uid), "uid")
 }
 
 func (l *LdapUtil) searchUserByDN(dn string) *ldap.Entry {
