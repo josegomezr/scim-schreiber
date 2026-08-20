@@ -163,7 +163,7 @@ func (h UserHandler) GetAll(r *http.Request, params scim.ListRequestParams) (sci
 			return scim.Page{}, err
 		}
 		if filterVal != "" {
-			uid = filterVal
+			uid = ldap.EscapeFilter(filterVal)
 		}
 	}
 
