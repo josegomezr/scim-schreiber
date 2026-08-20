@@ -16,8 +16,9 @@ import (
 )
 
 type Config struct {
-	Domain      string
-	Credentials string
+	Domain                 string
+	Credentials            string
+	IncludeMembersInGroups bool
 }
 
 func main() {
@@ -38,8 +39,9 @@ func main() {
 	}
 
 	cfg := Config{
-		Domain:      os.Getenv("GOOGLE_DOMAIN"),
-		Credentials: credentials,
+		Domain:                 os.Getenv("GOOGLE_DOMAIN"),
+		Credentials:            credentials,
+		IncludeMembersInGroups: os.Getenv("GOOGLE_INCLUDE_MEMBERS_IN_GROUPS") == "1",
 	}
 
 	adminClient, err := createAdminClientDefault(&cfg)
