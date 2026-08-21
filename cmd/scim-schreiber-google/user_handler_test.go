@@ -84,6 +84,9 @@ func (suite *SCIMUserTestSuite) TestCreateUser() {
 	assert.Equal(t, http.StatusCreated, response.Code)
 }
 
+//go:embed testdata/stubs/users/replace-user-response.json
+var replaceUserResponse string
+
 func (suite *SCIMUserTestSuite) TestReplaceUser() {
 	t := suite.T()
 
@@ -96,10 +99,18 @@ func (suite *SCIMUserTestSuite) TestReplaceUser() {
 	defer gock.Off()
 	gock.Observe(gock.DumpRequest)
 	suite.mockToken(t)
-	suite.mockWithRequestBody(t, "https://admin.googleapis.com/admin/directory/v1/users/"+testUserUUID, 200, replaceUserRequestExpectation, "replace-user-response.json")
+
+	gock.New("https://admin.googleapis.com").
+		Body(strings.NewReader(replaceUserRequestExpectation)).
+		Put("/admin/directory/v1/users/" + testUserUUID).
+		Reply(200).
+		BodyString(replaceUserResponse)
+
 	suite.mockOk(t, "https://licensing.googleapis.com/apps/licensing/v1/product/Google-Apps/sku/1010020026/user/testuser@dev.suse.com", "get_license.json")
 
 	suite.mockOk(t, "https://admin.googleapis.com/admin/directory/v1/users/"+testUserUUID+"/aliases", "alias.json")
+
+	aliasDeleteMock := gock.New("https://admin.googleapis.com").Delete("/admin/directory/v1/users/104965396198408263080/aliases/1000@example.com").Reply(201)
 
 	gock.New("https://licensing.googleapis.com").Delete("/apps/licensing/v1/product/Google-Apps/sku/1010020026/user/testuser@dev.suse.com").Reply(http.StatusNoContent)
 
@@ -108,6 +119,7 @@ func (suite *SCIMUserTestSuite) TestReplaceUser() {
 	response := httptest.NewRecorder()
 	suite.server.ServeHTTP(response, request)
 
+	assert.True(t, aliasDeleteMock.Done(), "Alias delete was not called")
 	assert.Equal(t, http.StatusOK, response.Code)
 	got := response.Body.String()
 	want := replaceUserExpectation
@@ -128,6 +140,7 @@ func (suite *SCIMUserTestSuite) TestPatchUser() {
 	suite.mockToken(t)
 	suite.mock(t, "https://admin.googleapis.com/admin/directory/v1/users/"+testUserUUID, 200, "replace-user-response.json")
 	suite.mockOk(t, "https://licensing.googleapis.com/apps/licensing/v1/product/Google-Apps/sku/1010020026/user/testuser@dev.suse.com", "get_license.json")
+	aliasDeleteMock := gock.New("https://admin.googleapis.com").Delete("/admin/directory/v1/users/104965396198408263080/aliases/1000@example.com").Reply(201)
 
 	gock.New("https://licensing.googleapis.com").Delete("/apps/licensing/v1/product/Google-Apps/sku/1010020026/user/testuser@dev.suse.com").Reply(http.StatusNoContent)
 
@@ -136,6 +149,7 @@ func (suite *SCIMUserTestSuite) TestPatchUser() {
 	response := httptest.NewRecorder()
 	suite.server.ServeHTTP(response, request)
 
+	assert.True(t, aliasDeleteMock.Done(), "Alias delete was not called")
 	assert.Equal(t, http.StatusOK, response.Code)
 	got := response.Body.String()
 	want := patchUserExpectation

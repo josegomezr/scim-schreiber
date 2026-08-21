@@ -550,13 +550,7 @@ func (h UserHandler) getAliases(attributes scim.ResourceAttributes) []string {
 				continue
 			}
 
-			_, domain, found := strings.Cut(email["value"].(string), "@")
-
-			if found && domain == h.cfg.Domain {
-				wantAliases = append(wantAliases, email["value"].(string))
-			} else {
-				slog.Warn("Invalid alias address", "email", email["value"])
-			}
+			wantAliases = append(wantAliases, email["value"].(string))
 		}
 	}
 	return wantAliases
