@@ -1,0 +1,24 @@
+{
+  "kind": "admin#directory#members",
+  "etag": "\"-RF1LyJd3kv0shh69vwOs78FoC71Z83RRj6ELsn1A_8/BSWIqd9HDgdPUG_WyJk6Tbgidc0\"",
+  "members": [
+    {
+      "kind": "admin#directory#member",
+      "etag": "\"-RF1LyJd3kv0shh69vwOs78FoC71Z83RRj6ELsn1A_8/1kHn89kx6LucyC6HT6SYx1tzbfc\"",
+      "id": "113765969969838891919",
+      "email": "svc_authentik@dev.suse.com",
+      "role": "MEMBER",
+      "type": "USER",
+      "status": "ACTIVE"
+    },
+    {
+      "kind": "admin#directory#member",
+      "etag": "\"-RF1LyJd3kv0shh69vwOs78FoC71Z83RRj6ELsn1A_8/nv8fEA7dCsmhdGUHRYLhhRh5TRs\"",
+      "id": "104963533172021742203",
+      "email": "testokta@dev.suse.com",
+      "role": "MEMBER",
+      "type": "USER",
+      "status": "ACTIVE"
+    }
+  ]
+}

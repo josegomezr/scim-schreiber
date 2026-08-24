@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -23,7 +24,7 @@ type GroupHandler struct {
 	client *admin.Service
 }
 
-func (h GroupHandler) Create(r *http.Request, attributes scim.ResourceAttributes) (scim.Resource, error) {
+func (h GroupHandler) Create(_ *http.Request, attributes scim.ResourceAttributes) (scim.Resource, error) {
 	slog.Info("POST /v2/Groups", "request", attributes)
 
 	groupRequest := resourceToGroup(attributes)
@@ -36,10 +37,10 @@ func (h GroupHandler) Create(r *http.Request, attributes scim.ResourceAttributes
 		return scim.Resource{}, scimerrors.ScimError{Status: http.StatusInternalServerError, Detail: err.Error()}
 	}
 
-	return groupToGroupResource(group), nil
+	return h.groupToGroupResource(group, false)
 }
 
-func (h GroupHandler) Delete(r *http.Request, id string) error {
+func (h GroupHandler) Delete(_ *http.Request, id string) error {
 	slog.Info("DELETE /v2/Groups", "id", id)
 	err := h.client.Groups.Delete(id).Do()
 	if err != nil {
@@ -49,7 +50,7 @@ func (h GroupHandler) Delete(r *http.Request, id string) error {
 	return nil
 }
 
-func (h GroupHandler) Get(r *http.Request, id string) (scim.Resource, error) {
+func (h GroupHandler) Get(_ *http.Request, id string) (scim.Resource, error) {
 	slog.Info("GET /v2/Groups", "id", id)
 
 	if id == "" {
@@ -64,10 +65,11 @@ func (h GroupHandler) Get(r *http.Request, id string) (scim.Resource, error) {
 			return scim.Resource{}, scimerrors.ScimErrorResourceNotFound(id)
 		}
 
-		return scim.Resource{}, err
+		slog.Warn("Error getting group", "id", id, "error", err)
+		return scim.Resource{}, scimerrors.ScimErrorInternal
 	}
 
-	return groupToGroupResource(group), nil
+	return h.groupToGroupResource(group, true)
 }
 
 func displayNameFromFilter(filterValidator *filter.Validator) (string, error) {
@@ -87,19 +89,46 @@ func displayNameFromFilter(filterValidator *filter.Validator) (string, error) {
 	return f.CompareValue.(string), nil
 }
 
-func groupToGroupResource(entry *admin.Group) scim.Resource {
+func (h GroupHandler) groupToGroupResource(entry *admin.Group, fetchMembers bool) (scim.Resource, error) {
+
 	googleExt := map[string]interface{}{
 		"email": entry.Email,
+	}
+
+	attributes := map[string]interface{}{
+		"displayName":       entry.Name,
+		SCHEMA_GOOGLE_GROUP: googleExt,
+	}
+
+	if fetchMembers {
+		membersAttribute := make([]map[string]interface{}, 0)
+
+		// Check if this feature is enabled.
+		// By returning an empty list we avoid authentik removing members it doesn't know about.
+		if h.cfg.IncludeMembersInGroups {
+			err := h.client.Members.List(entry.Id).Pages(context.Background(), func(members *admin.Members) error {
+				for _, member := range members.Members {
+					membersAttribute = append(membersAttribute, map[string]interface{}{
+						"value": member.Id,
+					})
+				}
+				return nil
+			})
+
+			if err != nil {
+				slog.Warn("Error getting group members", "id", entry.Id, "error", err)
+				return scim.Resource{}, scimerrors.ScimErrorInternal
+			}
+		}
+
+		attributes["members"] = membersAttribute
 	}
 
 	return scim.Resource{
 		ID:         entry.Id,
 		ExternalID: optional.NewString(entry.Id),
-		Attributes: map[string]interface{}{
-			"displayName":       entry.Name,
-			SCHEMA_GOOGLE_GROUP: googleExt,
-		},
-	}
+		Attributes: attributes,
+	}, nil
 }
 
 func resourceToGroup(resourceAttrs map[string]interface{}) *admin.Group {
@@ -115,7 +144,7 @@ func resourceToGroup(resourceAttrs map[string]interface{}) *admin.Group {
 	}
 }
 
-func (h GroupHandler) GetAll(r *http.Request, params scim.ListRequestParams) (scim.Page, error) {
+func (h GroupHandler) GetAll(_ *http.Request, params scim.ListRequestParams) (scim.Page, error) {
 	slog.Info("GET /v2/Groups", "params", params)
 	principal, err := displayNameFromFilter(params.FilterValidator)
 	if err != nil {
@@ -123,7 +152,7 @@ func (h GroupHandler) GetAll(r *http.Request, params scim.ListRequestParams) (sc
 	}
 
 	// TODO Pagination
-	request := h.client.Groups.List().Domain(h.cfg.Domain)
+	request := h.client.Groups.List().Domain(h.cfg.Domain).MaxResults(100)
 
 	if principal != "" {
 		filterExpr := fmt.Sprintf(`name='%s'`, principal)
@@ -138,7 +167,13 @@ func (h GroupHandler) GetAll(r *http.Request, params scim.ListRequestParams) (sc
 
 	resources := make([]scim.Resource, 0)
 	for _, group := range groups.Groups {
-		resources = append(resources, groupToGroupResource(group))
+		resource, err := h.groupToGroupResource(group, false)
+
+		if err != nil {
+			return scim.Page{}, err
+		}
+
+		resources = append(resources, resource)
 	}
 
 	return scim.Page{
@@ -147,7 +182,7 @@ func (h GroupHandler) GetAll(r *http.Request, params scim.ListRequestParams) (sc
 	}, nil
 }
 
-func (h GroupHandler) Patch(r *http.Request, id string, operations []scim.PatchOperation) (scim.Resource, error) {
+func (h GroupHandler) Patch(_ *http.Request, id string, operations []scim.PatchOperation) (scim.Resource, error) {
 	slog.Info("PATCH /v2/Groups", "id", id, "operations", operations)
 
 	var pushErrors string
@@ -199,7 +234,7 @@ func (h GroupHandler) Patch(r *http.Request, id string, operations []scim.PatchO
 	return scim.Resource{}, nil
 }
 
-func (h GroupHandler) Replace(r *http.Request, id string, attributes scim.ResourceAttributes) (scim.Resource, error) {
+func (h GroupHandler) Replace(_ *http.Request, id string, attributes scim.ResourceAttributes) (scim.Resource, error) {
 	slog.Info("PUT /v2/Groups", "id", id, "attributes", attributes)
 
 	groupRequest := resourceToGroup(attributes)
@@ -207,5 +242,5 @@ func (h GroupHandler) Replace(r *http.Request, id string, attributes scim.Resour
 	if err != nil {
 		return scim.Resource{}, scimerrors.ScimError{Status: http.StatusInternalServerError, Detail: err.Error()}
 	}
-	return groupToGroupResource(group), nil
+	return h.groupToGroupResource(group, true)
 }

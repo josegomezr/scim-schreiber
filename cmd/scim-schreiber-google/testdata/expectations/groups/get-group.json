@@ -6,6 +6,14 @@
     "location": "Groups/testGroupId",
     "resourceType": "Group"
   },
+  "members": [
+    {
+      "value": "113765969969838891919"
+    },
+    {
+      "value": "104963533172021742203"
+    }
+  ],
   "urn:ietf:params:scim:schemas:extension:google:2.0:CloudIdentityGroup": {
     "email": "google-workspace-staging@dev.suse.com"
   },

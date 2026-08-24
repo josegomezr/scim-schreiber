@@ -51,7 +51,8 @@ func (suite *SCIMGroupTestSuite) SetupSuite() {
 	suite.ctx = context.Background()
 
 	cfg := Config{
-		Domain: "dev.suse.com",
+		Domain:                 "dev.suse.com",
+		IncludeMembersInGroups: true,
 	}
 
 	client, err := createApiClientWithoutCredentials()
@@ -114,6 +115,7 @@ func (suite *SCIMGroupTestSuite) TestReplaceGroup() {
 	gock.New("https://admin.googleapis.com").Put("/admin/directory/v1/groups/" + testGroupId).Reply(http.StatusOK).Body(strings.NewReader(`
 		{"id": "1", "name":"Replaced Group", "email": "google-workspace-staging@dev.suse.com"}
    `))
+	suite.mockOk(t, "https://admin.googleapis.com/admin/directory/v1/groups/1/members", "members.json")
 
 	request, _ := http.NewRequest(http.MethodPut, "/Groups/"+testGroupId, file)
 
@@ -214,6 +216,8 @@ func (suite *SCIMGroupTestSuite) TestGetGroup() {
 	gock.New("https://admin.googleapis.com").Get("/admin/directory/v1/groups/" + testGroupId).Reply(http.StatusOK).Body(strings.NewReader(`
 		{"id": "1", "name":"Replaced Group", "email": "google-workspace-staging@dev.suse.com"}
    `))
+
+	suite.mockOk(t, "https://admin.googleapis.com/admin/directory/v1/groups/1/members", "members.json")
 
 	request, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("/Groups/%s", testGroupId), nil)
 	response := httptest.NewRecorder()
