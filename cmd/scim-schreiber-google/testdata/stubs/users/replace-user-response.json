@@ -49,6 +49,7 @@
       "type": "work"
     }
   ],
+  "aliases" : [ "1000@example.com" ],
   "nonEditableAliases": [
     "testuser@dev.suse.com.test-google-a.com"
   ],
