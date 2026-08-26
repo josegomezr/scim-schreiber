@@ -34,3 +34,7 @@ func UpdateSCIMExtensions(customFields CustomFields, googleExt map[string]interf
 func AdditionalScopes() []string {
 	return []string{}
 }
+
+func CanArchiveUser() bool {
+	return false
+}
