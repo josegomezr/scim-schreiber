@@ -455,3 +455,7 @@ func AdditionalScopes() []string {
 		admin.AdminDirectoryUserschemaScope,
 	}
 }
+
+func CanArchiveUser() bool {
+	return true
+}
