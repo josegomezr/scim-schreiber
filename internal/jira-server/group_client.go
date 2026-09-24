@@ -49,7 +49,7 @@ func (c *Client) ListAllGroups(displayName string) iter.Seq2[*Group, error] {
 				// Of course JIRA can't be consistent, the "self" attribute is
 				// reported on group details but not on group listing.
 				// thankfully is easy to findout
-				selfUrl := c.config.baseURL.JoinPath("/rest/api/2/group")
+				selfUrl := c.config.baseURL.JoinPath("/rest/api/2/group/member")
 				qs := selfUrl.Query()
 				qs.Set("groupname", jiraGroup.DisplayName)
 				selfUrl.RawQuery = qs.Encode()
@@ -69,7 +69,7 @@ func (c *Client) ListAllGroups(displayName string) iter.Seq2[*Group, error] {
 }
 
 func (c *Client) GetGroup(displayName string) (*Group, error) {
-	newu := c.config.baseURL.JoinPath("/rest/api/2/group")
+	newu := c.config.baseURL.JoinPath("/rest/api/2/group/member")
 	v := newu.Query()
 	v.Set("groupname", displayName)
 	newu.RawQuery = v.Encode()
@@ -89,6 +89,14 @@ func (c *Client) GetGroup(displayName string) (*Group, error) {
 		return nil, err
 	}
 
+	// I have so many negative comments about this API design... [0]
+	//
+	// GET Group does not exist anymore, only GET group MEMBERS...
+	//
+	// We'll retrofit group name & self upon successful request
+	//
+	// [0]: https://developer.atlassian.com/server/jira/platform/changelog/#CHANGE-1621
+	groupResp.DisplayName = displayName
 	groupResp.Members = []User{}
 	if c.config.IncludeMembersInGroups {
 		memResp, err := c.GetGroupMembers(displayName)
