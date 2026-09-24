@@ -69,41 +69,27 @@ func (c *Client) ListAllGroups(displayName string) iter.Seq2[*Group, error] {
 }
 
 func (c *Client) GetGroup(displayName string) (*Group, error) {
-	newu := c.config.baseURL.JoinPath("/rest/api/2/group/member")
-	v := newu.Query()
-	v.Set("groupname", displayName)
-	newu.RawQuery = v.Encode()
-
-	groupResp := Group{}
-	resp, err := c.newRequestRoundTrip("GET", newu.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	// dummy not found
-	if resp.StatusCode != http.StatusOK {
-		return nil, nil
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&groupResp); err != nil {
-		return nil, err
-	}
-
-	// I have so many negative comments about this API design... [0]
-	//
 	// GET Group does not exist anymore, only GET group MEMBERS...
 	//
 	// We'll retrofit group name & self upon successful request
 	//
-	// [0]: https://developer.atlassian.com/server/jira/platform/changelog/#CHANGE-1621
-	groupResp.DisplayName = displayName
-	groupResp.Members = []User{}
-	if c.config.IncludeMembersInGroups {
-		memResp, err := c.GetGroupMembers(displayName)
-		if err != nil {
-			return nil, err
-		}
+	// [0]:	 https://developer.atlassian.com/server/jira/platform/changelog/#CHANGE-1621
 
+	memResp, err := c.GetGroupMembers(displayName)
+	if err != nil {
+		return nil, err
+	}
+
+	// 404 case
+	if memResp == nil && err == nil {
+		return nil, nil
+	}
+
+	groupResp := Group{}
+	groupResp.DisplayName = displayName
+	if !c.config.IncludeMembersInGroups {
+		groupResp.Members = []User{}
+	} else {
 		groupResp.Members = memResp
 	}
 
