@@ -87,6 +87,7 @@ func displayNameFromFilter(filterValidator *filter.Validator) (string, error) {
 
 func jiraGroupToGroupResource(entry *jira.Group) scim.Resource {
 	members := []map[string]string{}
+
 	for _, mem := range entry.Members {
 		memberMap := make(map[string]string)
 		memberMap["value"] = mem.UserName
@@ -125,7 +126,9 @@ func (h GroupHandler) GetAll(r *http.Request, params scim.ListRequestParams) (sc
 		if err != nil {
 			return scim.Page{}, err
 		}
-		resources = append(resources, jiraGroupToGroupResource(jiraGroup))
+		if jiraGroup != nil {
+			resources = append(resources, jiraGroupToGroupResource(jiraGroup))
+		}
 	}
 
 	return scim.Page{

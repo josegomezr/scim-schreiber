@@ -12,12 +12,15 @@ import (
 
 func (c *Client) ListAllGroups(displayName string) iter.Seq2[*Group, error] {
 	return func(yield func(*Group, error) bool) {
-		newu := c.config.baseURL.JoinPath("/rest/api/2/groups/picker")
-		v := newu.Query()
+		// if display name provided (filter is always eq, do a single fetch)
 		if displayName != "" {
-			v.Set("query", displayName)
+			group, err := c.GetGroup(displayName)
+			yield(group, err)
+			return
 		}
 
+		newu := c.config.baseURL.JoinPath("/rest/api/2/groups/picker")
+		v := newu.Query()
 		v.Set("maxResults", "1000")
 		newu.RawQuery = v.Encode()
 
