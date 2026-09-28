@@ -87,6 +87,7 @@ func displayNameFromFilter(filterValidator *filter.Validator) (string, error) {
 
 func jiraGroupToGroupResource(entry *jira.Group) scim.Resource {
 	members := []map[string]string{}
+
 	for _, mem := range entry.Members {
 		memberMap := make(map[string]string)
 		memberMap["value"] = mem.UserName
@@ -125,7 +126,9 @@ func (h GroupHandler) GetAll(r *http.Request, params scim.ListRequestParams) (sc
 		if err != nil {
 			return scim.Page{}, err
 		}
-		resources = append(resources, jiraGroupToGroupResource(jiraGroup))
+		if jiraGroup != nil {
+			resources = append(resources, jiraGroupToGroupResource(jiraGroup))
+		}
 	}
 
 	return scim.Page{
@@ -159,26 +162,49 @@ func (h GroupHandler) Patch(r *http.Request, id string, operations []scim.PatchO
 			continue
 		}
 
-		switch op.Path.String() {
+		switch op.Path.AttributePath.AttributeName {
 		case "members":
-			for _, singleVal := range casting.MultiValue[map[string]interface{}](op.Value) {
-				value := casting.SingleValue[string](singleVal["value"])
-				if _, ok := exclusions[value]; ok {
-					slog.Info("Member present in exclusion list, ignoring change", "user", value, "group", id)
-					continue
-				}
+			value := ""
 
-				switch op.Op {
-				case scim.PatchOperationAdd:
-					adds = append(adds, value)
-				case scim.PatchOperationRemove:
-					removes = append(removes, value)
-				default:
-					return scim.Resource{}, scimerrors.ScimError{Status: http.StatusNotImplemented, Detail: "Only membership add/remove is allowed"}
+			if op.Value != nil {
+				// structure:
+				// path="members", value=[{value=user1}, {value=user2}]
+				for _, singleVal := range casting.MultiValue[map[string]interface{}](op.Value) {
+					value = casting.SingleValue[string](singleVal["value"])
+				}
+			} else {
+				// structure:
+				// path="members[value eq "user1], value=~
+				attrExpr := casting.SingleValue[*scim_filter_parser.AttributeExpression](op.Path.ValueExpression)
+				slog.Info("OP", "op", attrExpr.Operator)
+				if attrExpr != nil {
+					if attrExpr.Operator != "eq" {
+						slog.Info("Igroning value expression with non-eq operator", "expr", op.Path.String(), "value", op.Value)
+						continue
+					}
+					value = casting.SingleValue[string](attrExpr.CompareValue)
 				}
 			}
+
+			if value == "" {
+				slog.Info("Could not parse a value from filter expression", "expr", op.Path.String(), "value", op.Value)
+				continue
+			}
+
+			if _, ok := exclusions[value]; ok {
+				slog.Info("Member present in exclusion list, ignoring change", "user", value, "group", id)
+				continue
+			}
+			switch op.Op {
+			case scim.PatchOperationAdd:
+				adds = append(adds, value)
+			case scim.PatchOperationRemove:
+				removes = append(removes, value)
+			default:
+				slog.Info("Ignoring PATCH operation on members", "op", op.Op)
+			}
 		default:
-			return scim.Resource{}, scimerrors.ScimError{Status: http.StatusNotImplemented, Detail: "Only membership changes are allowed"}
+			slog.Info("Ignoring operation", "op", op.Op, "path", op.Path.String(), "value", op.Value)
 		}
 	}
 
@@ -224,6 +250,7 @@ func (h GroupHandler) Patch(r *http.Request, id string, operations []scim.PatchO
 	}
 
 	if !h.cfg.IgnoreGroupAddResponseCode && len(pushErrors) > 0 {
+		slog.Warn("Ignoring push errors. Faking a success response.", "pushErrors", pushErrors)
 		return scim.Resource{}, scimerrors.ScimError{Status: http.StatusInternalServerError, Detail: pushErrors}
 	}
 	return scim.Resource{}, nil
