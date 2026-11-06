@@ -202,27 +202,43 @@ func (h GroupHandler) Patch(_ *http.Request, id string, operations []scim.PatchO
 				pushErrors += err.Error() + "\n"
 				slog.Warn("Error replacing group", "error", err)
 			}
-		} else if op.Path != nil && op.Path.String() == "members" {
-			for _, singleVal := range casting.MultiValue[map[string]interface{}](op.Value) {
-				value := casting.SingleValue[string](singleVal["value"])
-				switch op.Op {
-				case scim.PatchOperationAdd:
-					member := admin.Member{
-						Id: value,
+		} else if op.Path != nil {
+			if op.Path.AttributePath.AttributeName == "members" { // Only care about operations targeting the members attribute
+
+				if op.Path.ValueExpression != nil {
+
+					expr, ok := op.Path.ValueExpression.(*scim_filter_parser.AttributeExpression)
+
+					if ok && expr.AttributePath.AttributeName == "value" && expr.Operator == "eq" { // Request path for remove operation: members[value eq "12345"]
+						if memberId, ok := expr.CompareValue.(string); ok {
+							if op.Op == scim.PatchOperationRemove {
+								if err := h.client.Members.Delete(id, memberId).Do(); err != nil {
+									pushErrors += err.Error() + "\n"
+									slog.Warn("Error removing user from group", "user", memberId, "error", err)
+								}
+							}
+						}
+					} else {
+						slog.Info("unsupported members value expression", "expression", op.Path.ValueExpression)
 					}
-					if _, err := h.client.Members.Insert(id, &member).Do(); err != nil {
-						pushErrors += err.Error() + "\n"
-						slog.Warn("Error adding user from group", "user", value, "error", err)
+
+				} else {
+					for _, singleVal := range casting.MultiValue[map[string]interface{}](op.Value) {
+						value := casting.SingleValue[string](singleVal["value"])
+						if op.Op == scim.PatchOperationAdd {
+							member := admin.Member{Id: value}
+							if _, err := h.client.Members.Insert(id, &member).Do(); err != nil {
+								pushErrors += err.Error() + "\n"
+								slog.Warn("Error adding user from group", "user", value, "error", err)
+							}
+						} else {
+							slog.Info("unknown OP", "operation", op.Op, "path", op.Path.String(), "value", singleVal)
+							continue
+						}
 					}
-				case scim.PatchOperationRemove:
-					if err := h.client.Members.Delete(id, value).Do(); err != nil {
-						pushErrors += err.Error() + "\n"
-						slog.Warn("Error removing user from group", "user", value, "error", err)
-					}
-				default:
-					slog.Info("unknown OP", "operation", op.Op, "path", op.Path, "value", singleVal)
-					continue
 				}
+			} else {
+				slog.Info("unhandled path", "operation", op.Op, "path", op.Path.String())
 			}
 		}
 	}

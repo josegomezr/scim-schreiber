@@ -154,56 +154,67 @@ func (suite *SCIMGroupTestSuite) TestPatch() {
 	t := suite.T()
 
 	tests := map[string]struct {
-		request  string
-		status   int
-		response string
+		request   string
+		status    int
+		mockSetup func(groupName string)
 	}{
 		"addMemberPathStyle": {
 			request: fmt.Sprintf(`
-				{
-				  "schemas": [
-					"urn:ietf:params:scim:api:messages:2.0:PatchOp"
-				  ],
-				  "Operations": [
-					 {
-					 	"op": "add", "path": "members", "value": [{"value": "%s"}]
-					 }
-				  ]
-				}
-			`, testUserUUID),
+             {
+               "schemas": [
+                "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+               ],
+               "Operations": [
+                 {
+                   "op": "add", "path": "members", "value": [{"value": "%s"}]
+                 }
+               ]
+             }
+          `, testUserUUID),
 			status: http.StatusNoContent,
+			mockSetup: func(groupName string) {
+				gock.New("https://admin.googleapis.com").
+					Post("/admin/directory/v1/groups/" + groupName + "/members").
+					Reply(http.StatusNoContent)
+			},
 		},
-		"removeMemberPathStyle": {
+		"removeMemberWithFilterAST": {
 			request: fmt.Sprintf(`
-				{
-				  "schemas": [
-					"urn:ietf:params:scim:api:messages:2.0:PatchOp"
-				  ],
-				  "Operations": [
-					 {
-					 	"op": "remove", "path": "members", "value": [{"value": "%s"}]
-					 }
-				  ]
-				}
-			`, testUserUUID),
+             {
+               "schemas": [
+                "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+               ],
+               "Operations": [
+                 {
+                   "op": "remove", "path": "members[value eq \"%s\"]"
+                 }
+               ]
+             }
+          `, testUserUUID),
 			status: http.StatusNoContent,
+			mockSetup: func(groupName string) {
+				gock.New("https://admin.googleapis.com").
+					Delete("/admin/directory/v1/groups/" + groupName + "/members/" + testUserUUID).
+					Reply(http.StatusNoContent)
+			},
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-
 			defer gock.Off()
 			gock.Observe(gock.DumpRequest)
-			gock.New("https://admin.googleapis.com").Post("/admin/directory/v1/groups/group-" + name + "/members").Reply(http.StatusNoContent)
-			gock.New("https://admin.googleapis.com").Delete("/admin/directory/v1/groups/group-" + name).Reply(http.StatusNoContent)
 
-			request, _ := http.NewRequest(http.MethodPatch, "/Groups/group-"+name, strings.NewReader(test.request))
+			groupName := "group-" + name
+			test.mockSetup(groupName)
+
+			request, _ := http.NewRequest(http.MethodPatch, "/Groups/"+groupName, strings.NewReader(test.request))
 
 			response := httptest.NewRecorder()
 			suite.server.ServeHTTP(response, request)
 
 			assert.Equal(t, test.status, response.Code)
+			assert.True(t, gock.IsDone(), "expected all mocked calls to be consumed")
 		})
 	}
 }
